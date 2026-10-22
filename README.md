@@ -199,6 +199,52 @@ işaretlemesi, rol bazlı erişim kontrolleri ve Excel/PDF rapor üretimi kapsan
 
 ---
 
+## 7b. Vercel ile Yayına Alma
+
+Depo: <https://github.com/ismailcanyalazz/sanalyoklama>
+
+Proje Vercel'in Python çalışma zamanı için hazırdır: `api/index.py` uygulamayı
+WSGI olarak dışa verir, `vercel.json` tüm istekleri bu fonksiyona yönlendirir.
+
+1. <https://vercel.com/new> → **Import Git Repository** → `sanalyoklama` deposunu seçin.
+2. Framework Preset: **Other**. Build/Output ayarlarına dokunmayın.
+3. **Environment Variables** bölümüne şunları ekleyin:
+
+   | Anahtar | Değer |
+   |---|---|
+   | `SECRET_KEY` | uzun, rastgele bir metin |
+   | `FLASK_CONFIG` | `production` |
+   | `SESSION_COOKIE_SECURE` | `1` |
+   | `DATABASE_URL` | PostgreSQL bağlantı adresi (aşağıya bakın) |
+   | `ADMIN_PASSWORD` | ilk yönetici parolası |
+
+4. **Deploy** → birkaç dakika içinde `https://<proje>.vercel.app` adresi hazır olur.
+
+### Veritabanı neden gerekli?
+
+Vercel'de uygulama **sunucusuz (serverless) fonksiyon** olarak çalışır: dosya
+sistemi salt okunurdur ve her istek farklı bir örneğe düşebilir. Bu nedenle
+SQLite dosyası kalıcı değildir — yoklama oturumu bir örnekte açılıp diğerinde
+görünmeyebilir. Ücretsiz bir PostgreSQL yeterlidir:
+
+* **Neon** (<https://neon.tech>) veya **Supabase** üzerinde ücretsiz bir veritabanı
+  oluşturun, verilen `postgresql://...` adresini `DATABASE_URL` olarak girin.
+* Alternatif: Vercel panelinde **Storage > Create Database > Postgres**;
+  `DATABASE_URL` otomatik tanımlanır.
+
+Tablolar ve ilk yönetici hesabı, uygulama ilk ayağa kalktığında otomatik
+oluşturulur (`AUTO_INIT_DB`, sunucusuz ortamda varsayılan olarak açıktır).
+Örnek veri eklemek için yerelde `DATABASE_URL`'i aynı adrese ayarlayıp
+`python seed.py` çalıştırmanız yeterlidir.
+
+### Netlify neden kullanılmıyor?
+
+Netlify yalnızca statik dosya ve JavaScript/Go fonksiyonları barındırır; Python
+(Flask) bir uygulamayı sunucu olarak çalıştıramaz. Bu proje için uygun ücretsiz
+seçenekler **Vercel**, **Render** veya **PythonAnywhere**'dir.
+
+---
+
 ## 8. Yönetim Komutları
 
 | Komut | Açıklama |
