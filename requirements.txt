@@ -1,0 +1,26 @@
+# --- Çekirdek ---
+Flask>=3.0,<4.0
+Flask-SQLAlchemy>=3.1,<4.0
+Flask-Login>=0.6.3,<0.7
+Flask-WTF>=1.2,<2.0
+WTForms>=3.1,<4.0
+SQLAlchemy>=2.0,<3.0
+python-dotenv>=1.0
+
+# --- QR kod üretimi ---
+qrcode>=7.4
+pillow>=10.0
+
+# --- Raporlama ---
+openpyxl>=3.1
+reportlab>=4.0
+
+# --- Yayına alma (bulut) ---
+gunicorn>=21.2
+# PostgreSQL kullanılacaksa:
+psycopg2-binary>=2.9
+
+# --- Geliştirme / test ---
+pytest>=8.0
+# Telefonla HTTPS üzerinden kamera testi için (isteğe bağlı):
+# pyopenssl>=24.0

@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+{% set page_title = "İstatistikler" %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+  <div>
+    <h1 class="h4 mb-0">Devam / Devamsızlık İstatistikleri</h1>
+    <p class="text-body-secondary small mb-0">
+      {{ data.start | d }} - {{ data.end | d }} ({{ data.session_count }} oturum)
+    </p>
+  </div>
+  <div class="btn-group btn-group-sm">
+    {% for option in [7, 30, 90, 180] %}
+      <a class="btn btn-outline-secondary {{ 'active' if days == option }}"
+         href="{{ url_for('admin.dashboard', gun=option) }}">{{ option }} gün</a>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="row g-2 mb-3">
+  <div class="col-6 col-lg-3">
+    <div class="card stat-card text-center h-100"><div class="card-body py-3">
+      <div class="stat-value">{{ data.overall_rate }}%</div>
+      <div class="stat-label">Genel Katılım</div></div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card stat-card text-center h-100"><div class="card-body py-3">
+      <div class="stat-value">{{ data.student_count }}</div>
+      <div class="stat-label">Aktif Öğrenci</div></div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card stat-card text-center h-100"><div class="card-body py-3">
+      <div class="stat-value">{{ data.session_count }}</div>
+      <div class="stat-label">Yoklama Oturumu</div></div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card stat-card text-center h-100"><div class="card-body py-3">
+      <div class="stat-value text-danger">{{ data.risky_students | length }}</div>
+      <div class="stat-label">Devamsızlık ≥ %{{ data.threshold | int }}</div></div></div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card h-100">
+      <div class="card-header">Gün Bazlı Katılım Oranı (%)</div>
+      <div class="card-body">
+        <canvas id="dailyChart" height="130"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header">Durum Dağılımı</div>
+      <div class="card-body">
+        <canvas id="statusChart" height="220"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card h-100">
+      <div class="card-header">Devamsızlığı En Yüksek 10 Öğrenci</div>
+      <div class="card-body">
+        <canvas id="absenceChart" height="240"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Uyarı Eşiğini Aşanlar</span>
+        <a class="small" href="{{ url_for('admin.reports') }}">Rapor al</a>
+      </div>
+      <div class="table-responsive" style="max-height:300px; overflow:auto">
+        <table class="table table-sm table-hover mb-0 align-middle">
+          <thead class="table-light">
+            <tr><th>Öğrenci</th><th>Oda</th><th>Yok</th><th>Devamsızlık</th></tr>
+          </thead>
+          <tbody>
+            {% for student in data.risky_students[:20] %}
+              <tr>
+                <td><a class="text-decoration-none"
+                       href="{{ url_for('admin.student_detail', user_id=student.student_id) }}">
+                  {{ student.full_name }}</a></td>
+                <td class="small">{{ student.room_no }}</td>
+                <td class="small">{{ student.absent }}</td>
+                <td><span class="badge text-bg-danger">
+                  {{ student.absence_rate }}%</span></td>
+              </tr>
+            {% else %}
+              <tr><td colspan="4" class="text-center text-body-secondary py-4">
+                Eşiği aşan öğrenci yok.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header">Son Oturumlar</div>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0 align-middle">
+          <thead class="table-light">
+            <tr><th>Tarih</th><th>Başlık</th><th>Durum</th><th>Katılım</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for s in last_sessions %}
+              {% set summary = s.summary() %}
+              <tr>
+                <td class="small">{{ s.session_date | d }}</td>
+                <td class="small">{{ s.title }}</td>
+                <td><span class="badge text-bg-{{ 'success' if s.is_open else 'secondary' }}">
+                  {{ s.status_label }}</span></td>
+                <td><span class="badge badge-soft">{{ summary.rate }}%</span></td>
+                <td class="text-end">
+                  <a class="btn btn-sm btn-outline-primary"
+                     href="{{ url_for('staff.session_detail', session_id=s.id) }}">
+                    <i class="bi bi-list-check"></i></a></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Son İşlemler (Günlük)</span>
+        {% if current_user.is_admin %}
+          <a class="small" href="{{ url_for('admin.logs') }}">Tümü</a>
+        {% endif %}
+      </div>
+      <ul class="list-group list-group-flush">
+        {% for log in recent_logs %}
+          <li class="list-group-item small">
+            <div class="d-flex justify-content-between">
+              <strong>{{ log.action }}</strong>
+              <span class="text-body-secondary">{{ log.created_at | dt('%d.%m %H:%M') }}</span>
+            </div>
+            <div class="text-body-secondary">{{ log.detail or '' }}</div>
+          </li>
+        {% else %}
+          <li class="list-group-item small text-body-secondary">Kayıt yok.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.min.js') }}"></script>
+<script id="chartData" type="application/json">
+  {{ {
+      "labels": data.daily | map(attribute='date') | list,
+      "rates": data.daily | map(attribute='rate') | list,
+      "absent": data.daily | map(attribute='absent') | list,
+      "distribution": {
+        "labels": ["Mevcut", "Geç Geldi", "İzinli", "Raporlu", "Yok"],
+        "values": [data.distribution.present, data.distribution.late,
+                   data.distribution.excused, data.distribution.reported,
+                   data.distribution.absent]
+      },
+      "top": {
+        "labels": data.students[:10] | map(attribute='full_name') | list,
+        "values": data.students[:10] | map(attribute='absence_rate') | list
+      }
+  } | tojson }}
+</script>
+<script>
+  (function () {
+    const payload = JSON.parse(document.getElementById("chartData").textContent);
+    const palette = {
+      navy: "#10233f", teal: "#0f766e", green: "#16a34a",
+      amber: "#d97706", red: "#dc2626", blue: "#2563eb", grey: "#94a3b8"
+    };
+
+    if (payload.labels.length) {
+      new Chart(document.getElementById("dailyChart"), {
+        type: "line",
+        data: {
+          labels: payload.labels,
+          datasets: [
+            {
+              label: "Katılım oranı (%)",
+              data: payload.rates,
+              borderColor: palette.teal,
+              backgroundColor: "rgba(15,118,110,.12)",
+              fill: true,
+              tension: .3,
+              pointRadius: 3
+            },
+            {
+              label: "Devamsız öğrenci",
+              data: payload.absent,
+              borderColor: palette.red,
+              backgroundColor: "transparent",
+              borderDash: [5, 4],
+              tension: .3,
+              pointRadius: 2,
+              yAxisID: "y1"
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          interaction: { mode: "index", intersect: false },
+          scales: {
+            y: { beginAtZero: true, max: 100, title: { display: true, text: "%" } },
+            y1: {
+              beginAtZero: true, position: "right",
+              grid: { drawOnChartArea: false },
+              title: { display: true, text: "kişi" }
+            }
+          }
+        }
+      });
+    }
+
+    new Chart(document.getElementById("statusChart"), {
+      type: "doughnut",
+      data: {
+        labels: payload.distribution.labels,
+        datasets: [{
+          data: payload.distribution.values,
+          backgroundColor: [palette.green, palette.amber, palette.blue,
+                            palette.grey, palette.red],
+          borderWidth: 0
+        }]
+      },
+      options: { plugins: { legend: { position: "bottom" } } }
+    });
+
+    if (payload.top.labels.length) {
+      new Chart(document.getElementById("absenceChart"), {
+        type: "bar",
+        data: {
+          labels: payload.top.labels,
+          datasets: [{
+            label: "Devamsızlık oranı (%)",
+            data: payload.top.values,
+            backgroundColor: palette.red
+          }]
+        },
+        options: {
+          indexAxis: "y",
+          scales: { x: { beginAtZero: true, max: 100 } },
+          plugins: { legend: { display: false } }
+        }
+      });
+    }
+  })();
+</script>
+{% endblock %}

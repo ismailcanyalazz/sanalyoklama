@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% set page_title = "Oturum Detayı" %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-start mb-3 gap-2">
+  <div>
+    <h1 class="h4 mb-1">{{ session.title }}</h1>
+    <p class="text-body-secondary small mb-0">
+      {{ session.session_date | d }} ·
+      {{ session.start_time | t }}-{{ session.end_time | t }} ·
+      <span class="badge text-bg-{{ 'success' if session.is_open else 'secondary' }}">
+        {{ session.status_label }}</span>
+      {% if session.closed_at %}
+        · Kapanış: {{ session.closed_at | dt }}
+      {% endif %}
+    </p>
+    {% if session.note %}
+      <p class="small mt-2 mb-0"><em>Not: {{ session.note }}</em></p>
+    {% endif %}
+  </div>
+  <div class="d-flex gap-2 flex-wrap no-print">
+    {% if session.is_open %}
+      <a class="btn btn-success btn-sm"
+         href="{{ url_for('staff.live_session', session_id=session.id) }}">
+        <i class="bi bi-qr-code"></i> QR Ekranı</a>
+      <form method="post" action="{{ url_for('staff.close', session_id=session.id) }}"
+            onsubmit="return confirm('Oturumu kapatmak istediğinize emin misiniz?');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-danger btn-sm"><i class="bi bi-stop-circle"></i>
+          Oturumu Kapat</button>
+      </form>
+    {% endif %}
+    <a class="btn btn-outline-success btn-sm"
+       href="{{ url_for('staff.session_report_excel', session_id=session.id) }}">
+      <i class="bi bi-file-earmark-excel"></i> Excel</a>
+    <a class="btn btn-outline-danger btn-sm"
+       href="{{ url_for('staff.session_report_pdf', session_id=session.id) }}">
+      <i class="bi bi-file-earmark-pdf"></i> PDF</a>
+    <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
+      <i class="bi bi-printer"></i> Yazdır</button>
+  </div>
+</div>
+
+<div class="row g-2 mb-3">
+  {% for key, label, color in [
+      ('present', 'Mevcut', 'success'), ('late', 'Geç Geldi', 'warning'),
+      ('excused', 'İzinli', 'info'), ('reported', 'Raporlu', 'secondary'),
+      ('absent', 'Yok', 'danger')] %}
+    <div class="col">
+      <div class="card stat-card text-center h-100"><div class="card-body py-3">
+        <div class="stat-value text-{{ color }}">{{ summary[key] }}</div>
+        <div class="stat-label">{{ label }}</div>
+      </div></div>
+    </div>
+  {% endfor %}
+  <div class="col">
+    <div class="card stat-card text-center h-100"><div class="card-body py-3">
+      <div class="stat-value">{{ summary.rate }}%</div>
+      <div class="stat-label">Katılım</div>
+    </div></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <span>Yoklama Listesi ({{ records | length }} kayıt)</span>
+    <div class="btn-group btn-group-sm no-print">
+      <a class="btn btn-outline-secondary {{ 'active' if not status_filter }}"
+         href="{{ url_for('staff.session_detail', session_id=session.id) }}">Tümü</a>
+      {% for key, label in STATUS_LABELS.items() %}
+        <a class="btn btn-outline-secondary {{ 'active' if status_filter == key }}"
+           href="{{ url_for('staff.session_detail', session_id=session.id, durum=key) }}">
+          {{ label }}</a>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>#</th><th>Ad Soyad</th><th>Öğrenci No</th><th>Oda</th>
+          <th>Durum</th><th>Yöntem</th><th>Saat</th><th>Açıklama</th>
+          <th class="no-print text-end">Manuel İşlem</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for record in records %}
+          <tr>
+            <td class="small text-body-secondary">{{ loop.index }}</td>
+            <td>
+              <a class="text-decoration-none"
+                 href="{{ url_for('admin.student_detail', user_id=record.student_id) }}">
+                {{ record.student.full_name }}</a>
+            </td>
+            <td class="small">{{ record.student.student_no or '-' }}</td>
+            <td class="small">{{ record.student.room_no or '-' }}</td>
+            <td><span class="badge text-bg-{{ record.status_badge }}">
+              {{ record.status_label }}</span></td>
+            <td class="small">{{ record.method_label }}</td>
+            <td class="small">{{ record.marked_at | dt('%H:%M:%S') }}</td>
+            <td class="small">
+              {{ record.note or '' }}
+              {% if record.updated_by %}
+                <div class="text-body-secondary" style="font-size:.72rem">
+                  {{ record.updated_by.full_name }} · {{ record.updated_at | dt }}
+                </div>
+              {% endif %}
+            </td>
+            <td class="text-end no-print text-nowrap">
+              <form method="post" class="d-inline"
+                    action="{{ url_for('staff.quick_mark', record_id=record.id, status='present') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm btn-outline-success" title="Mevcut">
+                  <i class="bi bi-check-lg"></i></button>
+              </form>
+              <form method="post" class="d-inline"
+                    action="{{ url_for('staff.quick_mark', record_id=record.id, status='absent') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm btn-outline-danger" title="Yok">
+                  <i class="bi bi-x-lg"></i></button>
+              </form>
+              <a class="btn btn-sm btn-outline-primary"
+                 href="{{ url_for('staff.edit_record', record_id=record.id) }}"
+                 title="Durum ve açıklama düzenle"><i class="bi bi-pencil"></i></a>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="9" class="text-center text-body-secondary py-4">
+            Bu filtreye uygun kayıt yok.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% set page_title = "Kayıt Düzenle" %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-pencil-square"></i> Manuel Yoklama Düzenleme
+      </div>
+      <div class="card-body">
+        <dl class="row small">
+          <dt class="col-4">Öğrenci</dt>
+          <dd class="col-8">{{ record.student.full_name }}
+            ({{ record.student.student_no or record.student.username }})</dd>
+          <dt class="col-4">Oda</dt>
+          <dd class="col-8">{{ record.student.room_no or '-' }}</dd>
+          <dt class="col-4">Oturum</dt>
+          <dd class="col-8">{{ record.session.title }} ·
+            {{ record.session.session_date | d }}</dd>
+          <dt class="col-4">Mevcut Durum</dt>
+          <dd class="col-8"><span class="badge text-bg-{{ record.status_badge }}">
+            {{ record.status_label }}</span>
+            <span class="text-body-secondary">({{ record.method_label }})</span></dd>
+        </dl>
+        <hr>
+        <form method="post" novalidate>
+          {{ form.hidden_tag() }}
+          <div class="mb-3">
+            {{ form.status.label(class="form-label") }}
+            {{ form.status(class="form-select") }}
+          </div>
+          <div class="mb-3">
+            {{ form.note.label(class="form-label") }}
+            {{ form.note(class="form-control", rows=3,
+                 placeholder="Örn: Sağlık raporu teslim etti / 22:40'ta geldi, geç kaldı.") }}
+            <div class="form-text">
+              Açıklama ve yapılan değişiklik, kullanıcı adı ve zaman damgasıyla
+              günlüğe kaydedilir.
+            </div>
+          </div>
+          <div class="d-flex gap-2">
+            {{ form.submit(class="btn btn-primary") }}
+            <a class="btn btn-outline-secondary"
+               href="{{ url_for('staff.session_detail', session_id=record.session_id) }}">
+              Vazgeç</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

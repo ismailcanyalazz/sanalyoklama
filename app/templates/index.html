@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% set page_title = "Giriş" %}
+{% block content %}
+<div class="hero mb-4">
+  <div class="row align-items-center g-4">
+    <div class="col-lg-7">
+      <h1 class="h2 fw-bold mb-3">Akşam yoklaması artık dijital</h1>
+      <p class="mb-4 opacity-90">
+        {{ DORM_NAME }} için geliştirilen bu sistemde yurt görevlisi ekranda
+        belirli aralıklarla yenilenen bir QR kod gösterir; öğrenciler kendi
+        telefonlarıyla kodu okutarak yoklamada <strong>mevcut</strong> olarak
+        işaretlenir. Tüm işlemler zaman damgasıyla kaydedilir ve geçmişe dönük
+        raporlanabilir.
+      </p>
+      <a href="{{ url_for('auth.login') }}" class="btn btn-light btn-lg fw-semibold">
+        <i class="bi bi-box-arrow-in-right"></i> Sisteme Giriş
+      </a>
+    </div>
+    <div class="col-lg-5 text-center">
+      <i class="bi bi-qr-code" style="font-size:9rem; opacity:.9"></i>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h2 class="h6"><i class="bi bi-shield-check text-success"></i> Güvenli doğrulama</h2>
+        <p class="small text-body-secondary mb-0">
+          Zamana bağlı tek kullanımlık kod (TOTP) üretimi, oturumun süre sonunda
+          otomatik kapanması ve aynı cihazdan çoklu kayıt engeli.
+        </p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h2 class="h6"><i class="bi bi-lightning-charge text-warning"></i> Hızlı yoklama</h2>
+        <p class="small text-body-secondary mb-0">
+          Kâğıt liste yerine saniyeler içinde kayıt; geç gelen, izinli ve raporlu
+          öğrenciler için görevliye manuel düzenleme yetkisi.
+        </p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h2 class="h6"><i class="bi bi-file-earmark-bar-graph text-primary"></i> Raporlama</h2>
+        <p class="small text-body-secondary mb-0">
+          Devamsızlık oranları grafiklerle sunulur; dönemlik yoklama raporları
+          Excel ve PDF olarak dışa aktarılır.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

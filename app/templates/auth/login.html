@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% set page_title = "Giriş" %}
+{% block content %}
+<div class="login-wrapper">
+  <div class="card">
+    <div class="card-body p-4">
+      <div class="text-center mb-4">
+        <i class="bi bi-qr-code-scan display-5 text-primary"></i>
+        <h1 class="h4 mt-2 mb-1">{{ APP_NAME }}</h1>
+        <p class="text-body-secondary small mb-0">{{ DORM_NAME }}</p>
+      </div>
+
+      <form method="post" novalidate>
+        {{ form.hidden_tag() }}
+        <div class="mb-3">
+          {{ form.username.label(class="form-label") }}
+          {{ form.username(class="form-control form-control-lg" + (" is-invalid" if form.username.errors else ""), autofocus=true, autocomplete="username") }}
+          {% for error in form.username.errors %}
+            <div class="invalid-feedback">{{ error }}</div>
+          {% endfor %}
+        </div>
+        <div class="mb-3">
+          {{ form.password.label(class="form-label") }}
+          {{ form.password(class="form-control form-control-lg" + (" is-invalid" if form.password.errors else ""), autocomplete="current-password") }}
+          {% for error in form.password.errors %}
+            <div class="invalid-feedback">{{ error }}</div>
+          {% endfor %}
+        </div>
+        <div class="form-check mb-3">
+          {{ form.remember_me(class="form-check-input") }}
+          {{ form.remember_me.label(class="form-check-label small") }}
+        </div>
+        {{ form.submit(class="btn btn-primary btn-lg w-100") }}
+      </form>
+
+      <p class="text-body-secondary small mt-4 mb-0">
+        Öğrenciler kullanıcı adı yerine <strong>öğrenci numarası</strong> ile de
+        giriş yapabilir. Parolanızı bilmiyorsanız yurt görevlisine başvurun.
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %}

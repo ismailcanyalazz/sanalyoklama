@@ -1,0 +1,8 @@
+tests/
+instance/
+.venv/
+__pycache__/
+*.db
+*.log
+*.bat
+.pytest_cache/

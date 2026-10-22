@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% set page_title = "Yetkisiz" %}
+{% block content %}
+<div class="text-center py-5">
+  <i class="bi bi-shield-exclamation display-1 text-warning"></i>
+  <h1 class="h3 mt-3">Bu sayfaya erişim yetkiniz yok</h1>
+  <p class="text-body-secondary">Rolünüz bu işlemi gerçekleştirmeye izin vermiyor.</p>
+  <a href="{{ url_for('main.index') }}" class="btn btn-primary">Ana sayfaya dön</a>
+</div>
+{% endblock %}

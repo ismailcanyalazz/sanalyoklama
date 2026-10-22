@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% set page_title = "Canlı Yoklama" %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+  <div>
+    <h1 class="h4 mb-0">{{ session.title }}</h1>
+    <p class="text-body-secondary small mb-0">
+      {{ session.session_date | d }} ·
+      {{ session.start_time | t }}-{{ session.end_time | t }} ·
+      Oturum No: {{ session.id }}
+    </p>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-primary btn-sm"
+       href="{{ url_for('staff.session_detail', session_id=session.id) }}">
+      <i class="bi bi-pencil-square"></i> Manuel Düzenleme</a>
+    {% if session.is_open %}
+      <form method="post" action="{{ url_for('staff.close', session_id=session.id) }}"
+            onsubmit="return confirm('Oturumu kapatmak istediğinize emin misiniz? Okutmayan öğrenciler Yok olarak işaretlenecek.');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-danger btn-sm" type="submit">
+          <i class="bi bi-stop-circle"></i> Oturumu Kapat</button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3" id="liveWrapper"
+     data-session-id="{{ session.id }}"
+     data-code-url="{{ url_for('api.session_code', session_id=session.id) }}"
+     data-state-url="{{ url_for('api.session_state', session_id=session.id) }}"
+     data-qr-url="{{ url_for('api.session_qr', session_id=session.id) }}"
+     data-detail-url="{{ url_for('staff.session_detail', session_id=session.id) }}"
+     data-refresh-seconds="{{ session.refresh_seconds }}"
+     data-is-open="{{ '1' if session.is_open else '0' }}">
+
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-qr-code"></i> Dinamik QR Kod</span>
+        <span class="badge text-bg-light" id="sessionCountdown">--:--</span>
+      </div>
+      <div class="card-body">
+        <div class="qr-stage">
+          <img id="qrImage" src="{{ url_for('api.session_qr', session_id=session.id) }}"
+               alt="Yoklama QR kodu">
+          <div class="qr-code-text mt-3" id="codeText">------</div>
+          <div class="countdown-bar mt-2">
+            <div id="refreshBar" style="width:100%"></div>
+          </div>
+          <p class="small text-body-secondary mt-2 mb-0" id="refreshInfo">
+            Kod her {{ session.refresh_seconds }} saniyede yenilenir.
+          </p>
+        </div>
+
+        <div class="alert alert-secondary small mt-3 mb-0">
+          <strong>Öğrenci yönergesi:</strong> Telefonundan sisteme giriş yapıp
+          <em>Yoklama Ver</em> ekranından bu kodu okutsun. Telefonun kendi kamera
+          uygulaması ile okutulduğunda da aynı adres açılır.
+        </div>
+        <div id="closedNotice" class="alert alert-danger mt-3 d-none">
+          Bu oturum kapandı. Yeni kayıt alınamaz.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="row g-2 mb-3">
+      <div class="col-6 col-md-3">
+        <div class="card stat-card text-center"><div class="card-body py-3">
+          <div class="stat-value text-success" id="statPresent">{{ summary.present }}</div>
+          <div class="stat-label">Mevcut</div></div></div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card stat-card text-center"><div class="card-body py-3">
+          <div class="stat-value text-danger" id="statAbsent">{{ summary.absent }}</div>
+          <div class="stat-label">Yok</div></div></div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card stat-card text-center"><div class="card-body py-3">
+          <div class="stat-value text-info" id="statExcused">{{ summary.excused + summary.reported }}</div>
+          <div class="stat-label">İzinli/Raporlu</div></div></div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card stat-card text-center"><div class="card-body py-3">
+          <div class="stat-value" id="statRate">{{ summary.rate }}%</div>
+          <div class="stat-label">Katılım</div></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-broadcast"></i> Canlı Liste</span>
+        <small class="text-body-secondary" id="lastUpdate">güncelleniyor…</small>
+      </div>
+      <div class="table-responsive" style="max-height: 460px; overflow-y:auto">
+        <table class="table table-sm table-hover mb-0 align-middle table-sticky">
+          <thead>
+            <tr><th>Ad Soyad</th><th>Oda</th><th>Durum</th><th>Saat</th></tr>
+          </thead>
+          <tbody id="liveList">
+            {% for record in session.records | sort(attribute='student.full_name') %}
+              <tr>
+                <td>{{ record.student.full_name }}
+                  <div class="text-body-secondary" style="font-size:.75rem">
+                    {{ record.student.student_no or '-' }}</div></td>
+                <td class="small">{{ record.student.room_no or '-' }}</td>
+                <td><span class="badge text-bg-{{ record.status_badge }}">
+                  {{ record.status_label }}</span></td>
+                <td class="small">{{ record.marked_at | dt('%H:%M:%S') }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/live_session.js') }}"></script>
+{% endblock %}

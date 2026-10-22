@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% set page_title = "Yoklama Sonucu" %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-5">
+    <div class="card border-{{ 'success' if ok else 'danger' }}">
+      <div class="card-body text-center py-5">
+        {% if ok %}
+          <i class="bi bi-check-circle-fill display-3 text-success"></i>
+          <h1 class="h4 mt-3">Yoklamanız alındı</h1>
+          <p class="text-body-secondary mb-1">
+            {{ record.session.title }} · {{ record.marked_at | dt }}
+          </p>
+          <span class="badge text-bg-success">{{ record.status_label }}</span>
+        {% else %}
+          <i class="bi bi-x-circle-fill display-3 text-danger"></i>
+          <h1 class="h4 mt-3">Yoklama alınamadı</h1>
+          <p class="text-body-secondary">{{ message }}</p>
+        {% endif %}
+        <div class="mt-4 d-flex gap-2 justify-content-center">
+          {% if current_user.is_authenticated and current_user.is_student %}
+            <a class="btn btn-primary" href="{{ url_for('student.dashboard') }}">
+              Panele dön</a>
+            {% if not ok %}
+              <a class="btn btn-outline-primary" href="{{ url_for('student.scan_page') }}">
+                Tekrar dene</a>
+            {% endif %}
+          {% else %}
+            <a class="btn btn-primary" href="{{ url_for('main.index') }}">Ana sayfa</a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

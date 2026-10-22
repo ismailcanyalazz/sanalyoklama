@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% set page_title = "Proje Hakkında" %}
+{% block content %}
+<div class="card">
+  <div class="card-header">Proje Hakkında</div>
+  <div class="card-body">
+    <p>
+      <strong>{{ APP_NAME }}</strong>, {{ DORM_NAME }}'nda kâğıt üzerinde ve yüz yüze
+      yürütülen akşam yoklaması işleminin web tabanlı bir yazılımla dijital ortama
+      taşınması amacıyla geliştirilmiştir.
+    </p>
+
+    <h2 class="h6 mt-4">Kullanıcı rolleri</h2>
+    <ul class="small">
+      <li><strong>Öğrenci:</strong> QR kodu okutarak yoklama verir, kendi kayıtlarını
+        ve izinlerini görür.</li>
+      <li><strong>Yurt görevlisi:</strong> Oturum açar/kapatır, canlı listeyi izler,
+        manuel kayıt düzenler, izin/rapor girer, rapor indirir.</li>
+      <li><strong>Yönetici:</strong> Kullanıcı yönetimi, devamsızlık istatistikleri,
+        sistem günlüğü ve dönemlik raporlar.</li>
+    </ul>
+
+    <h2 class="h6 mt-4">Güvenlik mekanizmaları</h2>
+    <ul class="small">
+      <li>Oturuma özel gizli anahtar ile üretilen, zamana bağlı tek kullanımlık kod
+        (TOTP, RFC 6238) ve belirli aralıklarla yenilenen dinamik QR kod.</li>
+      <li>Oturumun tanımlı bitiş saatinde otomatik kapanması.</li>
+      <li>Aynı cihaz ve oturum üzerinden birden fazla kayıt alınmasının engellenmesi
+        (cihaz kimliği + veritabanı tekillik kısıtı).</li>
+      <li>Parolaların özetlenerek (hash) saklanması, rol tabanlı yetkilendirme,
+        CSRF koruması.</li>
+      <li>Tüm kritik işlemlerin zaman damgası, IP ve tarayıcı bilgisiyle günlüğe
+        yazılması.</li>
+    </ul>
+
+    <h2 class="h6 mt-4">Kullanılan teknolojiler</h2>
+    <p class="small mb-0">
+      Python · Flask · SQLAlchemy ORM · SQLite/PostgreSQL · Flask-Login ·
+      Flask-WTF · HTML5 · CSS · Bootstrap 5 · JavaScript · html5-qrcode ·
+      Chart.js · openpyxl · ReportLab · Git/GitHub
+    </p>
+  </div>
+</div>
+{% endblock %}

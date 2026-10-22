@@ -1,0 +1,128 @@
+{% set page_title = page_title if page_title is defined else None %}
+<!doctype html>
+<html lang="tr" data-bs-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{% if page_title %}{{ page_title }} · {% endif %}{{ APP_NAME }}</title>
+  <link rel="stylesheet"
+        href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}">
+  <link rel="stylesheet"
+        href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
+</head>
+<body class="bg-body-tertiary">
+
+<nav class="navbar navbar-expand-lg navbar-dark app-navbar sticky-top">
+  <div class="container">
+    <a class="navbar-brand d-flex align-items-center gap-2" href="{{ url_for('main.index') }}">
+      <i class="bi bi-qr-code-scan fs-4"></i>
+      <span>
+        <strong>Sanal Yoklama</strong>
+        <small class="d-block lh-1 opacity-75" style="font-size:.7rem">{{ DORM_NAME }}</small>
+      </span>
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+            data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false"
+            aria-label="Menü">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="mainNav">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        {% if current_user.is_authenticated %}
+          {% if current_user.is_student %}
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('student.dashboard') }}">
+              <i class="bi bi-house"></i> Panelim</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('student.scan_page') }}">
+              <i class="bi bi-qr-code-scan"></i> Yoklama Ver</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('student.my_records') }}">
+              <i class="bi bi-list-check"></i> Kayıtlarım</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('student.my_leaves') }}">
+              <i class="bi bi-calendar-check"></i> İzinlerim</a></li>
+          {% endif %}
+          {% if current_user.can_manage_attendance %}
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('staff.dashboard') }}">
+              <i class="bi bi-play-circle"></i> Yoklama</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('staff.sessions') }}">
+              <i class="bi bi-clock-history"></i> Oturumlar</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('staff.leaves') }}">
+              <i class="bi bi-calendar-check"></i> İzinler</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.reports') }}">
+              <i class="bi bi-file-earmark-bar-graph"></i> Raporlar</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.dashboard') }}">
+              <i class="bi bi-graph-up"></i> İstatistik</a></li>
+          {% endif %}
+          {% if current_user.is_admin %}
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.users') }}">
+              <i class="bi bi-people"></i> Kullanıcılar</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.logs') }}">
+              <i class="bi bi-journal-text"></i> Günlük</a></li>
+          {% endif %}
+        {% endif %}
+      </ul>
+
+      <ul class="navbar-nav">
+        {% if current_user.is_authenticated %}
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle d-flex align-items-center gap-2"
+               href="#" role="button" data-bs-toggle="dropdown">
+              <i class="bi bi-person-circle fs-5"></i>
+              <span class="d-none d-lg-inline">{{ current_user.full_name }}</span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><h6 class="dropdown-header">{{ current_user.role_label }}</h6></li>
+              <li><a class="dropdown-item" href="{{ url_for('auth.profile') }}">
+                <i class="bi bi-shield-lock"></i> Parola Değiştir</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item text-danger" href="{{ url_for('auth.logout') }}">
+                <i class="bi bi-box-arrow-right"></i> Çıkış Yap</a></li>
+            </ul>
+          </li>
+        {% else %}
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('auth.login') }}">
+              <i class="bi bi-box-arrow-in-right"></i> Giriş Yap</a>
+          </li>
+        {% endif %}
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<main class="container py-4">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="mb-3">
+        {% for category, message in messages %}
+          <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show"
+               role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"
+                    aria-label="Kapat"></button>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="py-4 mt-auto text-center text-body-secondary small">
+  <div class="container">
+    {{ DORM_NAME }} · {{ APP_NAME }}
+    <span class="mx-2">|</span>
+    <a class="link-secondary text-decoration-none" href="{{ url_for('main.about') }}">
+      Proje hakkında</a>
+    <span class="mx-2">|</span>
+    {{ current_time.strftime('%d.%m.%Y %H:%M') }}
+  </div>
+</footer>
+
+<script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

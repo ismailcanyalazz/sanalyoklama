@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% set page_title = "İzin / Rapor" %}
+{% block content %}
+<h1 class="h4 mb-3">İzin ve Rapor Kayıtları</h1>
+
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-plus-circle"></i> Yeni Kayıt</div>
+      <div class="card-body">
+        <form method="post" novalidate>
+          {{ form.hidden_tag() }}
+          <div class="mb-3">
+            {{ form.student_id.label(class="form-label") }}
+            {{ form.student_id(class="form-select") }}
+          </div>
+          <div class="mb-3">
+            {{ form.leave_type.label(class="form-label") }}
+            {{ form.leave_type(class="form-select") }}
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              {{ form.start_date.label(class="form-label") }}
+              {{ form.start_date(class="form-control", type="date") }}
+            </div>
+            <div class="col-6">
+              {{ form.end_date.label(class="form-label") }}
+              {{ form.end_date(class="form-control", type="date") }}
+            </div>
+          </div>
+          <div class="mb-3">
+            {{ form.note.label(class="form-label") }}
+            {{ form.note(class="form-control", rows=2) }}
+          </div>
+          {{ form.submit(class="btn btn-primary w-100") }}
+          <div class="form-text mt-2">
+            Kayıt eklendiğinde, tarih aralığındaki yoklamalarda öğrenci otomatik
+            olarak izinli/raporlu işaretlenir.
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header">Son 30 Gün ve Gelecek Kayıtlar</div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr><th>Öğrenci</th><th>Tür</th><th>Başlangıç</th><th>Bitiş</th>
+              <th>Açıklama</th><th>Ekleyen</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for leave in leaves %}
+              <tr>
+                <td>{{ leave.student.full_name }}
+                  <div class="text-body-secondary" style="font-size:.75rem">
+                    {{ leave.student.student_no or '-' }}</div></td>
+                <td><span class="badge text-bg-info">{{ leave.type_label }}</span></td>
+                <td class="small">{{ leave.start_date | d }}</td>
+                <td class="small">{{ leave.end_date | d }}</td>
+                <td class="small">{{ leave.note or '' }}</td>
+                <td class="small">{{ leave.created_by.full_name if leave.created_by else '-' }}</td>
+                <td class="text-end">
+                  <form method="post"
+                        action="{{ url_for('staff.delete_leave', leave_id=leave.id) }}"
+                        onsubmit="return confirm('İzin kaydı silinsin mi?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-sm btn-outline-danger">
+                      <i class="bi bi-trash"></i></button>
+                  </form>
+                </td>
+              </tr>
+            {% else %}
+              <tr><td colspan="7" class="text-center text-body-secondary py-4">
+                Kayıt bulunmuyor.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% set page_title = "Profil" %}
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header">Hesap Bilgileri</div>
+      <div class="card-body">
+        <dl class="row small mb-0">
+          <dt class="col-5">Ad Soyad</dt><dd class="col-7">{{ current_user.full_name }}</dd>
+          <dt class="col-5">Kullanıcı Adı</dt><dd class="col-7">{{ current_user.username }}</dd>
+          <dt class="col-5">Rol</dt><dd class="col-7">{{ current_user.role_label }}</dd>
+          {% if current_user.is_student %}
+            <dt class="col-5">Öğrenci No</dt><dd class="col-7">{{ current_user.student_no or '-' }}</dd>
+            <dt class="col-5">Oda No</dt><dd class="col-7">{{ current_user.room_no or '-' }}</dd>
+            <dt class="col-5">Program</dt><dd class="col-7">{{ current_user.department or '-' }}</dd>
+          {% endif %}
+          <dt class="col-5">Son Giriş</dt>
+          <dd class="col-7">{{ current_user.last_login_at | dt }}</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header">Parola Değiştir</div>
+      <div class="card-body">
+        <form method="post" novalidate>
+          {{ form.hidden_tag() }}
+          <div class="mb-3">
+            {{ form.current_password.label(class="form-label") }}
+            {{ form.current_password(class="form-control") }}
+          </div>
+          <div class="mb-3">
+            {{ form.new_password.label(class="form-label") }}
+            {{ form.new_password(class="form-control" + (" is-invalid" if form.new_password.errors else "")) }}
+            {% for error in form.new_password.errors %}
+              <div class="invalid-feedback">{{ error }}</div>
+            {% endfor %}
+          </div>
+          <div class="mb-3">
+            {{ form.confirm_password.label(class="form-label") }}
+            {{ form.confirm_password(class="form-control" + (" is-invalid" if form.confirm_password.errors else "")) }}
+            {% for error in form.confirm_password.errors %}
+              <div class="invalid-feedback">{{ error }}</div>
+            {% endfor %}
+          </div>
+          {{ form.submit(class="btn btn-primary") }}
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% set page_title = student.full_name %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-start mb-3 gap-2">
+  <div>
+    <h1 class="h4 mb-1">{{ student.full_name }}</h1>
+    <p class="text-body-secondary small mb-0">
+      {{ student.student_no or student.username }}
+      {% if student.room_no %} · Oda {{ student.room_no }}{% endif %}
+      {% if student.department %} · {{ student.department }}{% endif %}
+      {% if student.class_year %} · {{ student.class_year }}. sınıf{% endif %}
+    </p>
+  </div>
+  <form class="d-flex gap-2 no-print" method="get">
+    <input class="form-control form-control-sm" type="date" name="baslangic"
+           value="{{ start.isoformat() }}">
+    <input class="form-control form-control-sm" type="date" name="bitis"
+           value="{{ end.isoformat() }}">
+    <button class="btn btn-sm btn-primary">Filtrele</button>
+  </form>
+</div>
+
+{% if stat %}
+  <div class="row g-2 mb-3">
+    <div class="col-4 col-md-2">
+      <div class="card stat-card text-center h-100"><div class="card-body py-3">
+        <div class="stat-value text-success">{{ stat.present }}</div>
+        <div class="stat-label">Mevcut</div></div></div>
+    </div>
+    <div class="col-4 col-md-2">
+      <div class="card stat-card text-center h-100"><div class="card-body py-3">
+        <div class="stat-value text-warning">{{ stat.late }}</div>
+        <div class="stat-label">Geç</div></div></div>
+    </div>
+    <div class="col-4 col-md-2">
+      <div class="card stat-card text-center h-100"><div class="card-body py-3">
+        <div class="stat-value text-info">{{ stat.excused + stat.reported }}</div>
+        <div class="stat-label">İzinli/Raporlu</div></div></div>
+    </div>
+    <div class="col-4 col-md-2">
+      <div class="card stat-card text-center h-100"><div class="card-body py-3">
+        <div class="stat-value text-danger">{{ stat.absent }}</div>
+        <div class="stat-label">Yok</div></div></div>
+    </div>
+    <div class="col-4 col-md-2">
+      <div class="card stat-card text-center h-100"><div class="card-body py-3">
+        <div class="stat-value">{{ stat.attendance_rate }}%</div>
+        <div class="stat-label">Katılım</div></div></div>
+    </div>
+    <div class="col-4 col-md-2">
+      <div class="card stat-card text-center h-100"><div class="card-body py-3">
+        <div class="stat-value">{{ stat.total }}</div>
+        <div class="stat-label">Toplam</div></div></div>
+    </div>
+  </div>
+{% else %}
+  <div class="alert alert-secondary small">
+    Seçilen dönemde bu öğrenciye ait yoklama kaydı bulunmuyor.
+  </div>
+{% endif %}
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header">Yoklama Kayıtları</div>
+      <div class="table-responsive" style="max-height:520px">
+        <table class="table table-sm table-hover align-middle mb-0 table-sticky">
+          <thead>
+            <tr><th>Tarih</th><th>Oturum</th><th>Durum</th><th>Yöntem</th>
+              <th>Saat</th><th>Açıklama</th><th class="no-print"></th></tr>
+          </thead>
+          <tbody>
+            {% for record in records %}
+              <tr>
+                <td class="small">{{ record.session.session_date | d }}</td>
+                <td class="small">{{ record.session.title }}</td>
+                <td><span class="badge text-bg-{{ record.status_badge }}">
+                  {{ record.status_label }}</span></td>
+                <td class="small">{{ record.method_label }}</td>
+                <td class="small">{{ record.marked_at | dt('%H:%M') }}</td>
+                <td class="small">{{ record.note or '' }}</td>
+                <td class="no-print text-end">
+                  <a class="btn btn-sm btn-outline-primary"
+                     href="{{ url_for('staff.edit_record', record_id=record.id) }}">
+                    <i class="bi bi-pencil"></i></a></td>
+              </tr>
+            {% else %}
+              <tr><td colspan="7" class="text-center text-body-secondary py-4">
+                Kayıt yok.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header">İzin / Rapor Geçmişi</div>
+      <ul class="list-group list-group-flush">
+        {% for leave in leaves %}
+          <li class="list-group-item small">
+            <span class="badge text-bg-info">{{ leave.type_label }}</span>
+            {{ leave.start_date | d }} - {{ leave.end_date | d }}
+            {% if leave.note %}<div class="text-body-secondary">{{ leave.note }}</div>{% endif %}
+          </li>
+        {% else %}
+          <li class="list-group-item small text-body-secondary">Kayıt yok.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

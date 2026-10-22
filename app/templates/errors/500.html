@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% set page_title = "Hata" %}
+{% block content %}
+<div class="text-center py-5">
+  <i class="bi bi-exclamation-triangle display-1 text-danger"></i>
+  <h1 class="h3 mt-3">Beklenmeyen bir hata oluştu</h1>
+  <p class="text-body-secondary">
+    Hata kaydı sunucu günlüğüne yazıldı. Lütfen tekrar deneyin.
+  </p>
+  <a href="{{ url_for('main.index') }}" class="btn btn-primary">Ana sayfaya dön</a>
+</div>
+{% endblock %}

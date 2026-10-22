@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% set page_title = "Yoklama Ver" %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+
+    {% if not open_session %}
+      <div class="alert alert-secondary">
+        <i class="bi bi-info-circle"></i> Şu anda açık bir yoklama oturumu
+        bulunmuyor. Yoklama saatinde tekrar deneyin.
+      </div>
+      <a class="btn btn-outline-secondary" href="{{ url_for('student.dashboard') }}">
+        Panele dön</a>
+
+    {% elif already_marked %}
+      <div class="card border-success">
+        <div class="card-body text-center py-5">
+          <i class="bi bi-check-circle-fill display-3 text-success"></i>
+          <h1 class="h4 mt-3">Yoklamanız alındı</h1>
+          <p class="text-body-secondary mb-1">
+            {{ open_session.title }} · {{ record.marked_at | dt }}
+          </p>
+          <span class="badge text-bg-{{ record.status_badge }}">
+            {{ record.status_label }}</span>
+          <div class="mt-4">
+            <a class="btn btn-primary" href="{{ url_for('student.dashboard') }}">
+              Panele dön</a>
+          </div>
+        </div>
+      </div>
+
+    {% else %}
+      <div class="card" id="scanCard"
+           data-session-id="{{ open_session.id }}"
+           data-scan-url="{{ url_for('api.scan') }}"
+           data-dashboard-url="{{ url_for('student.dashboard') }}">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-qr-code-scan"></i> QR Kodu Okut</span>
+          <span class="badge text-bg-light">{{ open_session.title }}</span>
+        </div>
+        <div class="card-body">
+          <p class="small text-body-secondary">
+            Kameranızı görevlinin ekranındaki QR koda doğrultun. Kod belirli
+            aralıklarla yenilenir; süresi geçmiş kodlar kabul edilmez.
+          </p>
+
+          <div id="qr-reader" class="border bg-dark-subtle"></div>
+
+          <div class="d-flex gap-2 justify-content-center mt-3">
+            <button class="btn btn-primary" id="startScan">
+              <i class="bi bi-camera-video"></i> Kamerayı Başlat</button>
+            <button class="btn btn-outline-secondary d-none" id="stopScan">
+              <i class="bi bi-stop"></i> Durdur</button>
+          </div>
+
+          <div class="scan-feedback text-center mt-3" id="scanFeedback"></div>
+
+          <hr>
+          <details>
+            <summary class="small">Kamera açılmıyor mu? Kodu elle girin</summary>
+            <form class="row g-2 mt-2" id="manualForm">
+              <div class="col-8">
+                <input class="form-control" id="manualCode" inputmode="numeric"
+                       maxlength="6" placeholder="Ekrandaki 6 haneli kod">
+              </div>
+              <div class="col-4">
+                <button class="btn btn-outline-primary w-100" type="submit">
+                  Gönder</button>
+              </div>
+            </form>
+            <div class="form-text">
+              Ekranda QR kodun altında yazan 6 haneli kodu girin. Kod yenilenmeden
+              önce göndermeniz gerekir.
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <div class="alert alert-warning small mt-3">
+        <i class="bi bi-shield-exclamation"></i>
+        Her öğrenci <strong>kendi telefonundan</strong> okutmalıdır. Aynı cihazdan
+        ikinci bir kayıt alınmaz ve deneme sistem günlüğüne yazılır.
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if open_session and not already_marked %}
+  <script src="{{ url_for('static', filename='vendor/html5-qrcode/html5-qrcode.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/scanner.js') }}"></script>
+{% endif %}
+{% endblock %}
