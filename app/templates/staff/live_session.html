@@ -54,9 +54,11 @@
         </div>
 
         <div class="alert alert-secondary small mt-3 mb-0">
-          <strong>Öğrenci yönergesi:</strong> Telefonundan sisteme giriş yapıp
-          <em>Yoklama Ver</em> ekranından bu kodu okutsun. Telefonun kendi kamera
-          uygulaması ile okutulduğunda da aynı adres açılır.
+          <strong>Öğrenci yönergesi:</strong> Telefonun kamerasıyla bu QR kodu
+          okutun; açılan sayfada okul numaranızı ve ad soyadınızı yazın.
+          Sisteme giriş yapmanız gerekmez. Kamera çalışmıyorsa
+          <code>{{ url_for('scan.manual', _external=True) }}</code> adresinden
+          ekrandaki 6 haneli kodu elle girebilirsiniz.
         </div>
         <div id="closedNotice" class="alert alert-danger mt-3 d-none">
           Bu oturum kapandı. Yeni kayıt alınamaz.

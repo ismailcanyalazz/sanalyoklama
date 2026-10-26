@@ -95,7 +95,9 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False, index=True)
     full_name = db.Column(db.String(120), nullable=False)
-    password_hash = db.Column(db.String(255), nullable=False)
+    # Öğrenci hesapları parolasızdır (boş metin): giriş yapmaz, yalnızca
+    # yoklamada numara + ad soyad ile doğrulanırlar.
+    password_hash = db.Column(db.String(255), nullable=False, default="")
     role = db.Column(db.String(16), nullable=False, default=ROLE_STUDENT, index=True)
     email = db.Column(db.String(120))
     phone = db.Column(db.String(32))
@@ -124,11 +126,27 @@ class User(UserMixin, db.Model):
     )
 
     # --- parola ---
-    def set_password(self, raw_password: str) -> None:
-        self.password_hash = generate_password_hash(raw_password)
+    def set_password(self, raw_password: str | None) -> None:
+        """Parola belirler. None/boş verilirse hesap parolasız olur.
+
+        Öğrenciler sisteme giriş yapmadığı için parolasız kaydedilir; bu
+        hesaplarla giriş denemesi her zaman başarısız olur (bkz. can_login).
+        """
+        self.password_hash = generate_password_hash(raw_password) if raw_password else ""
 
     def check_password(self, raw_password: str) -> bool:
+        if not self.password_hash:
+            return False
         return check_password_hash(self.password_hash, raw_password)
+
+    @property
+    def has_password(self) -> bool:
+        return bool(self.password_hash)
+
+    @property
+    def can_login(self) -> bool:
+        """Yalnızca görevli ve yönetici hesapları sisteme giriş yapabilir."""
+        return self.role in (ROLE_STAFF, ROLE_ADMIN) and self.has_password
 
     # --- roller ---
     @property

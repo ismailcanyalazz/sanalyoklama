@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% set page_title = "Öğrenci" %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header">
+        {% if student %}
+          <i class="bi bi-pencil-square"></i> Öğrenciyi Düzenle: {{ student.full_name }}
+        {% else %}
+          <i class="bi bi-person-plus"></i> Yeni Öğrenci
+        {% endif %}
+      </div>
+      <div class="card-body">
+        <p class="small text-body-secondary">
+          Öğrenciler sisteme giriş yapmaz; kullanıcı adı ve parola gerekmez.
+          Yoklamada kimlik, burada kayıtlı <strong>okul numarası</strong> ve
+          <strong>ad soyad</strong> ile doğrulanır. Bu yüzden ad soyadı, öğrencinin
+          yoklama ekranında yazacağı biçimde (resmî adıyla) girin.
+        </p>
+
+        <form method="post" novalidate>
+          {{ form.hidden_tag() }}
+          <div class="row g-3">
+            <div class="col-md-5">
+              {{ form.student_no.label(class="form-label") }}
+              {{ form.student_no(class="form-control" + (" is-invalid" if form.student_no.errors else "")) }}
+              {% for error in form.student_no.errors %}
+                <div class="invalid-feedback">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="col-md-7">
+              {{ form.full_name.label(class="form-label") }}
+              {{ form.full_name(class="form-control" + (" is-invalid" if form.full_name.errors else "")) }}
+              {% for error in form.full_name.errors %}
+                <div class="invalid-feedback">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="col-md-3">
+              {{ form.room_no.label(class="form-label") }}
+              {{ form.room_no(class="form-control") }}
+            </div>
+            <div class="col-md-6">
+              {{ form.department.label(class="form-label") }}
+              {{ form.department(class="form-control") }}
+            </div>
+            <div class="col-md-3">
+              {{ form.class_year.label(class="form-label") }}
+              {{ form.class_year(class="form-control") }}
+            </div>
+            <div class="col-md-6">
+              {{ form.phone.label(class="form-label") }}
+              {{ form.phone(class="form-control") }}
+            </div>
+            <div class="col-md-6">
+              {{ form.email.label(class="form-label") }}
+              {{ form.email(class="form-control") }}
+            </div>
+            <div class="col-12">
+              <div class="form-check">
+                {{ form.is_active_account(class="form-check-input") }}
+                {{ form.is_active_account.label(class="form-check-label") }}
+                <div class="form-text">
+                  Pasif kayıtlar yoklama listesine alınmaz ve yoklama veremez.
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="d-flex gap-2 mt-4">
+            {{ form.submit(class="btn btn-primary") }}
+            <a class="btn btn-outline-secondary"
+               href="{{ url_for('admin.users', rol='student') }}">Vazgeç</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

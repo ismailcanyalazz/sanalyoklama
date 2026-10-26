@@ -30,6 +30,20 @@ def login():
             or_(User.username == identifier, User.student_no == identifier)
         ).first()
 
+        # Öğrenciler sisteme giriş yapmaz; yoklama için QR kodu okutmaları yeterli.
+        if user is not None and user.is_student:
+            log_action(
+                "login_blocked",
+                detail=f"Öğrenci hesabı ile giriş denemesi: {identifier}",
+                commit=True,
+            )
+            flash(
+                "Öğrenciler sisteme giriş yapmaz. Yoklama için yurt görevlisinin "
+                "ekranındaki QR kodu okutmanız yeterlidir.",
+                "info",
+            )
+            return render_template("auth/login.html", form=form), 403
+
         if user is None or not user.check_password(form.password.data):
             log_action(
                 "login_failed",

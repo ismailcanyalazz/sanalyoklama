@@ -11,6 +11,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import math
 import os
 import secrets
 import struct
@@ -84,9 +85,14 @@ def verify_totp(secret: str, code: str, step: int = 15, window: int = 1,
 
 
 def seconds_until_refresh(step: int = 15, timestamp: float | None = None) -> int:
-    """Ekrandaki QR kodun yenilenmesine kalan saniye."""
+    """Ekrandaki QR kodun yenilenmesine kalan saniye.
+
+    Kalan süre yukarı yuvarlanır. Aşağı yuvarlanması hâlinde görevli ekranı
+    pencere sınırından bir an önce yeni kodu isteyip hâlâ eski kodu alır ve
+    ekranda gösterilen kod kalıcı olarak bir pencere geride kalırdı.
+    """
     ts = time.time() if timestamp is None else timestamp
-    return int(step - (ts % step)) or step
+    return int(math.ceil(step - (ts % step))) or step
 
 
 # --------------------------------------------------------------------------- #
@@ -97,7 +103,7 @@ def build_scan_payload(session_id: int, code: str) -> str:
 
     Biçim: NMYO|<oturum_id>|<kod>
     Telefonun kendi kamerası ile okutulduğunda açılacak bağlantı ise
-    /yoklama/<oturum_id>/<kod> adresidir (bkz. api.scan_link).
+    /yoklama/<oturum_id>/<kod> adresidir (bkz. blueprints/scan.py: identify).
     """
     return f"NMYO|{session_id}|{code}"
 

@@ -12,8 +12,9 @@
 
     <h2 class="h6 mt-4">Kullanıcı rolleri</h2>
     <ul class="small">
-      <li><strong>Öğrenci:</strong> QR kodu okutarak yoklama verir, kendi kayıtlarını
-        ve izinlerini görür.</li>
+      <li><strong>Öğrenci:</strong> Sisteme giriş yapmaz. Görevlinin ekranındaki
+        QR kodu telefonuyla okutur, açılan formda okul numarası ile ad soyadını
+        yazar; bilgiler kayıtlarla eşleşirse yoklaması alınır.</li>
       <li><strong>Yurt görevlisi:</strong> Oturum açar/kapatır, canlı listeyi izler,
         manuel kayıt düzenler, izin/rapor girer, rapor indirir.</li>
       <li><strong>Yönetici:</strong> Kullanıcı yönetimi, devamsızlık istatistikleri,
@@ -24,6 +25,11 @@
     <ul class="small">
       <li>Oturuma özel gizli anahtar ile üretilen, zamana bağlı tek kullanımlık kod
         (TOTP, RFC 6238) ve belirli aralıklarla yenilenen dinamik QR kod.</li>
+      <li>Okul numarası ile ad soyadın yurt kayıtlarıyla eşleştirilmesi; eşleşmeyen
+        okutmaların reddedilmesi ve günlüğe yazılması.</li>
+      <li>QR okutulduktan sonra formun doldurulması için verilen, okutan cihaza
+        bağlı ve kısa ömürlü imzalı bilet (bağlantının başka telefona
+        iletilmesini etkisiz kılar).</li>
       <li>Oturumun tanımlı bitiş saatinde otomatik kapanması.</li>
       <li>Aynı cihaz ve oturum üzerinden birden fazla kayıt alınmasının engellenmesi
         (cihaz kimliği + veritabanı tekillik kısıtı).</li>
@@ -36,8 +42,8 @@
     <h2 class="h6 mt-4">Kullanılan teknolojiler</h2>
     <p class="small mb-0">
       Python · Flask · SQLAlchemy ORM · SQLite/PostgreSQL · Flask-Login ·
-      Flask-WTF · HTML5 · CSS · Bootstrap 5 · JavaScript · html5-qrcode ·
-      Chart.js · openpyxl · ReportLab · Git/GitHub
+      Flask-WTF · itsdangerous · HTML5 · CSS · Bootstrap 5 · JavaScript ·
+      Chart.js · qrcode · openpyxl · ReportLab · Git/GitHub
     </p>
   </div>
 </div>

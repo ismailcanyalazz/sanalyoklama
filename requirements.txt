@@ -17,10 +17,7 @@ reportlab>=4.0
 
 # --- Yayına alma (bulut) ---
 gunicorn>=21.2
-# PostgreSQL kullanılacaksa:
+# PostgreSQL (Vercel Postgres / Neon / Render) için:
 psycopg2-binary>=2.9
 
-# --- Geliştirme / test ---
-pytest>=8.0
-# Telefonla HTTPS üzerinden kamera testi için (isteğe bağlı):
-# pyopenssl>=24.0
+# Geliştirme ve test bağımlılıkları requirements-dev.txt dosyasındadır.

@@ -7,6 +7,8 @@ import os
 import tempfile
 from pathlib import Path
 
+from sqlalchemy.pool import NullPool
+
 BASE_DIR = Path(__file__).resolve().parent
 INSTANCE_DIR = BASE_DIR / "instance"
 
@@ -58,13 +60,21 @@ class Config:
     )
 
     # --- Veritabanı ---
+    # Vercel Postgres bağlantıyı POSTGRES_URL adıyla da tanımlar.
     SQLALCHEMY_DATABASE_URI = _normalize_db_url(
-        os.environ.get("DATABASE_URL") or f"sqlite:///{DATA_DIR / 'yoklama.db'}"
+        os.environ.get("DATABASE_URL")
+        or os.environ.get("POSTGRES_URL")
+        or os.environ.get("POSTGRES_URL_NON_POOLING")
+        or f"sqlite:///{DATA_DIR / 'yoklama.db'}"
     )
     # Sunucusuz (serverless) dağıtımda tablolar ilk istekte oluşturulur.
     AUTO_INIT_DB = _as_bool(os.environ.get("AUTO_INIT_DB"), IS_SERVERLESS)
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}
+    # Sunucusuz ortamda her çağrı ayrı bir süreçte çalıştığı için bağlantı
+    # havuzu tutulmaz; aksi hâlde kopmuş bağlantılar yeniden kullanılır.
+    SQLALCHEMY_ENGINE_OPTIONS = (
+        {"poolclass": NullPool} if IS_SERVERLESS else {"pool_pre_ping": True}
+    )
 
     # --- Oturum / çerez güvenliği ---
     SESSION_COOKIE_HTTPONLY = True
@@ -87,10 +97,22 @@ class Config:
     )
     # Okutma denemesi hız sınırı: aynı IP için 1 dakikada en fazla N istek
     SCAN_RATE_LIMIT = int(os.environ.get("SCAN_RATE_LIMIT", 30))
+    # QR okutulduktan sonra numara + ad soyad formunun doldurulması için
+    # tanınan süre (saniye). Kod bu sürede yenilenmeye devam eder; forma
+    # özel kısa ömürlü bilet bu süre boyunca geçerlidir.
+    SCAN_TICKET_MAX_AGE = int(os.environ.get("SCAN_TICKET_MAX_AGE", 180))
     # Devamsızlık uyarı eşiği (%)
     ABSENCE_WARNING_THRESHOLD = float(
         os.environ.get("ABSENCE_WARNING_THRESHOLD", 20)
     )
+    # QR kodun içine yazılacak adresin sabitlenmesi (isteğe bağlı).
+    # Boş bırakılırsa görevli ekranının açıldığı adres kullanılır; bu durumda
+    # panel "localhost" ile açılırsa QR da localhost'u gösterir ve telefon
+    # okuyamaz. Yerel ağda test ederken örneğin:
+    #   PUBLIC_BASE_URL=http://192.168.1.25:5000
+    PUBLIC_BASE_URL = (os.environ.get("PUBLIC_BASE_URL") or "").strip().rstrip("/")
+    # Ters vekil sunucu (Vercel vb.) arkasında X-Forwarded-* başlıklarına güven
+    TRUST_PROXY = _as_bool(os.environ.get("TRUST_PROXY"), IS_SERVERLESS)
 
     # --- İlk yönetici hesabı (flask init-db ile oluşturulur) ---
     ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
@@ -110,9 +132,12 @@ class ProductionConfig(Config):
 class TestingConfig(Config):
     TESTING = True
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+    SQLALCHEMY_ENGINE_OPTIONS = {}
     WTF_CSRF_ENABLED = False
     QR_REFRESH_SECONDS = 15
     SCAN_RATE_LIMIT = 1000
+    AUTO_INIT_DB = False
+    TRUST_PROXY = False
 
 
 CONFIGS = {
@@ -124,5 +149,8 @@ CONFIGS = {
 
 
 def get_config(name: str | None = None):
-    name = name or os.environ.get("FLASK_CONFIG", "default")
+    # Sunucusuz ortamda (Vercel) FLASK_CONFIG tanımlanmamışsa üretim ayarları
+    # kullanılır: hata ayıklama kapalı, çerezler yalnızca HTTPS üzerinden.
+    default_name = "production" if IS_SERVERLESS else "default"
+    name = name or os.environ.get("FLASK_CONFIG", default_name)
     return CONFIGS.get(name, DevelopmentConfig)

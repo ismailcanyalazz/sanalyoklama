@@ -21,12 +21,12 @@ from wtforms.validators import (
     ValidationError,
 )
 
-from .models import LEAVE_TYPES, ROLE_LABELS, STATUS_LABELS
+from .models import LEAVE_TYPES, ROLE_ADMIN, ROLE_LABELS, ROLE_STAFF, STATUS_LABELS
 
 
 class LoginForm(FlaskForm):
     username = StringField(
-        "Kullanıcı Adı / Öğrenci No",
+        "Kullanıcı Adı",
         validators=[DataRequired("Kullanıcı adı zorunludur."), Length(max=64)],
     )
     password = PasswordField(
@@ -91,7 +91,52 @@ class RecordEditForm(FlaskForm):
     submit = SubmitField("Kaydet")
 
 
+class StudentForm(FlaskForm):
+    """Öğrenci kaydı: yalnızca okul numarası ve ad soyad zorunludur.
+
+    Öğrenciler sisteme giriş yapmadığı için kullanıcı adı ve parola alanı
+    yoktur; yoklamada kimlik, bu iki bilgi ile doğrulanır.
+    """
+
+    student_no = StringField(
+        "Okul Numarası",
+        validators=[DataRequired("Okul numarası zorunludur."), Length(max=32)],
+    )
+    full_name = StringField(
+        "Ad Soyad",
+        validators=[DataRequired("Ad soyad zorunludur."), Length(min=3, max=120)],
+    )
+    room_no = StringField("Oda No", validators=[Optional(), Length(max=16)])
+    department = StringField("Program/Bölüm", validators=[Optional(), Length(max=120)])
+    class_year = StringField("Sınıf", validators=[Optional(), Length(max=16)])
+    phone = StringField("Telefon", validators=[Optional(), Length(max=32)])
+    email = StringField("E-posta", validators=[Optional(), Length(max=120)])
+    is_active_account = BooleanField("Kayıt aktif", default=True)
+    submit = SubmitField("Kaydet")
+
+    def validate_full_name(self, field):
+        if len((field.data or "").split()) < 2:
+            raise ValidationError("Ad ve soyadı birlikte yazın.")
+
+
+class StudentBulkForm(FlaskForm):
+    """Birden çok öğrenciyi tek seferde ekleme (her satır: numara ; ad soyad)."""
+
+    rows = TextAreaField(
+        "Öğrenci Listesi",
+        validators=[DataRequired("En az bir satır girin.")],
+        description=(
+            "Her satıra bir öğrenci yazın: okul numarası, ad soyad "
+            "(ayraç olarak virgül, noktalı virgül veya sekme kullanılabilir). "
+            "İstenirse üçüncü alan olarak oda numarası eklenebilir."
+        ),
+    )
+    submit = SubmitField("Listeyi Ekle")
+
+
 class UserForm(FlaskForm):
+    """Görevli / yönetici hesabı (öğrenciler için StudentForm kullanılır)."""
+
     full_name = StringField(
         "Ad Soyad", validators=[DataRequired("Ad soyad zorunludur."), Length(max=120)]
     )
@@ -108,22 +153,38 @@ class UserForm(FlaskForm):
     )
     role = SelectField(
         "Rol",
-        choices=[(key, label) for key, label in ROLE_LABELS.items()],
-        default="student",
+        choices=[
+            (ROLE_STAFF, ROLE_LABELS[ROLE_STAFF]),
+            (ROLE_ADMIN, ROLE_LABELS[ROLE_ADMIN]),
+        ],
+        default=ROLE_STAFF,
     )
-    student_no = StringField("Öğrenci No", validators=[Optional(), Length(max=32)])
-    department = StringField("Program/Bölüm", validators=[Optional(), Length(max=120)])
-    class_year = StringField("Sınıf", validators=[Optional(), Length(max=16)])
-    room_no = StringField("Oda No", validators=[Optional(), Length(max=16)])
     email = StringField("E-posta", validators=[Optional(), Length(max=120)])
     phone = StringField("Telefon", validators=[Optional(), Length(max=32)])
     is_active_account = BooleanField("Hesap aktif", default=True)
     password = PasswordField(
         "Parola",
         validators=[Optional(), Length(min=8, message="En az 8 karakter olmalıdır.")],
-        description="Yeni kullanıcıda zorunlu; düzenlemede boş bırakılırsa parola değişmez.",
+        description="Yeni hesapta zorunlu; düzenlemede boş bırakılırsa parola değişmez.",
     )
     submit = SubmitField("Kaydet")
+
+
+class AdminPasswordForm(FlaskForm):
+    """Yöneticinin, bir görevli/yönetici hesabının parolasını sıfırlaması."""
+
+    new_password = PasswordField(
+        "Yeni Parola",
+        validators=[
+            DataRequired("Yeni parola zorunludur."),
+            Length(min=8, message="Parola en az 8 karakter olmalıdır."),
+        ],
+    )
+    confirm_password = PasswordField(
+        "Yeni Parola (Tekrar)",
+        validators=[EqualTo("new_password", message="Parolalar eşleşmiyor.")],
+    )
+    submit = SubmitField("Parolayı Sıfırla")
 
 
 class LeaveForm(FlaskForm):

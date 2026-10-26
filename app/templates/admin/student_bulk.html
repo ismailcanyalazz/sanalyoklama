@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% set page_title = "Öğrenci Listesi Ekle" %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-list-ul"></i> Listeyle Öğrenci Ekle
+      </div>
+      <div class="card-body">
+        <p class="small text-body-secondary">
+          Her satıra bir öğrenci yazın. Sıra: <code>okul numarası ; ad soyad</code>
+          ve istenirse <code>; oda no</code>. Ayraç olarak virgül, noktalı virgül
+          veya sekme kullanılabilir. Zaten kayıtlı numaralar atlanır.
+        </p>
+        <pre class="small bg-body-tertiary border rounded p-2 mb-3">202300101 ; Ayşe Yılmaz ; 101
+202300102 ; Elif Demir ; 102</pre>
+
+        <form method="post" novalidate>
+          {{ form.hidden_tag() }}
+          {{ form.rows.label(class="form-label") }}
+          {{ form.rows(class="form-control font-monospace" + (" is-invalid" if form.rows.errors else ""), rows=12) }}
+          {% for error in form.rows.errors %}
+            <div class="invalid-feedback">{{ error }}</div>{% endfor %}
+          <div class="d-flex gap-2 mt-3">
+            {{ form.submit(class="btn btn-primary") }}
+            <a class="btn btn-outline-secondary"
+               href="{{ url_for('admin.users', rol='student') }}">Vazgeç</a>
+          </div>
+        </form>
+      </div>
+      {% if added or skipped %}
+        <div class="card-footer small">
+          {% if added %}
+            <div class="text-success mb-1">
+              <i class="bi bi-check2"></i> Eklenen: {{ added | length }}
+            </div>
+          {% endif %}
+          {% if skipped %}
+            <div class="text-warning-emphasis">
+              <i class="bi bi-exclamation-triangle"></i> Atlanan: {{ skipped | length }}
+            </div>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

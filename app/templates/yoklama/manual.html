@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% set page_title = "Yoklama Ver" %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-5">
+
+    {% if not open_session %}
+      <div class="alert alert-secondary">
+        <i class="bi bi-info-circle"></i> Şu anda açık bir yoklama oturumu
+        bulunmuyor. Yoklama saatinde tekrar deneyin.
+      </div>
+      <a class="btn btn-outline-secondary" href="{{ url_for('main.index') }}">
+        Ana sayfa</a>
+    {% else %}
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-keyboard"></i> Kodu Elle Gir</span>
+          <span class="badge text-bg-light">{{ open_session.title }}</span>
+        </div>
+        <div class="card-body">
+          <p class="small text-body-secondary">
+            Normal yol, görevlinin ekranındaki QR kodu telefonunuzun kamerasıyla
+            okutmaktır. Kamera çalışmıyorsa ekranda QR kodun altında yazan
+            6 haneli kodu buraya girin. Kod birkaç saniyede bir yenilenir;
+            girdiğiniz kodun geçerli olması için formu hemen göndermelisiniz.
+          </p>
+
+          {% if error %}
+            <div class="alert alert-danger py-2 small mb-3">
+              <i class="bi bi-exclamation-triangle"></i> {{ error }}
+            </div>
+          {% endif %}
+
+          <form method="post" novalidate>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="mb-3">
+              <label class="form-label" for="code">Ekrandaki 6 Haneli Kod</label>
+              <input class="form-control form-control-lg" id="code" name="code"
+                     inputmode="numeric" autocomplete="off" required
+                     value="{{ values.get('code', '') }}">
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label" for="student_no">Okul Numarası</label>
+              <input class="form-control form-control-lg" id="student_no"
+                     name="student_no" inputmode="numeric" autocomplete="off"
+                     required value="{{ values.get('student_no', '') }}">
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label" for="full_name">Ad Soyad</label>
+              <input class="form-control form-control-lg" id="full_name"
+                     name="full_name" autocomplete="off" required
+                     value="{{ values.get('full_name', '') }}">
+            </div>
+
+            <button class="btn btn-primary btn-lg w-100" type="submit">
+              <i class="bi bi-check2-circle"></i> Yoklamamı Ver
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="alert alert-warning small mt-3">
+        <i class="bi bi-shield-exclamation"></i>
+        Yoklamayı <strong>kendi telefonunuzdan</strong> vermelisiniz. Aynı cihazdan
+        ikinci bir öğrenci için kayıt alınmaz ve deneme sistem günlüğüne yazılır.
+      </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}

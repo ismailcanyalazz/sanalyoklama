@@ -31,9 +31,22 @@ def create_app(config_name: str | None = None) -> Flask:
     except ImportError:
         pass
 
+    # Ters vekil sunucu arkasında (Vercel) isteğin gerçek şeması ve alan adı
+    # X-Forwarded-* başlıklarından okunur; aksi hâlde QR kodun içine yazılan
+    # adres "http://" ile üretilir.
+    if app.config.get("TRUST_PROXY"):
+        from werkzeug.middleware.proxy_fix import ProxyFix
+
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
     db.init_app(app)
     login_manager.init_app(app)
     csrf.init_app(app)
+
+    # Okutma denemelerinin hız sınırını yapılandırmadan al
+    from .utils.security import scan_limiter
+
+    scan_limiter.limit = int(app.config["SCAN_RATE_LIMIT"])
 
     _register_blueprints(app)
     _register_error_handlers(app)
@@ -41,9 +54,20 @@ def create_app(config_name: str | None = None) -> Flask:
     _register_hooks(app)
     _register_cli(app)
     _configure_logging(app)
+    _warn_about_secret_key(app)
     _bootstrap_database(app)
 
     return app
+
+
+def _warn_about_secret_key(app: Flask) -> None:
+    """Yayında varsayılan gizli anahtar kullanılıyorsa uyarır."""
+    default_key = "gelistirme-ortami-icin-gizli-anahtar"
+    if app.config["SECRET_KEY"] == default_key and not app.debug:
+        app.logger.warning(
+            "SECRET_KEY ortam değişkeni tanımlanmamış; yayında mutlaka "
+            "uzun ve rastgele bir değer tanımlayın."
+        )
 
 
 def _bootstrap_database(app: Flask) -> None:
@@ -82,12 +106,13 @@ def _register_blueprints(app: Flask) -> None:
     from .blueprints.api import api_bp
     from .blueprints.auth import auth_bp
     from .blueprints.main import main_bp
+    from .blueprints.scan import scan_bp
     from .blueprints.staff import staff_bp
-    from .blueprints.student import student_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
-    app.register_blueprint(student_bp, url_prefix="/ogrenci")
+    # Öğrenci tarafı: giriş gerektirmeyen yoklama akışı
+    app.register_blueprint(scan_bp)
     app.register_blueprint(staff_bp, url_prefix="/gorevli")
     app.register_blueprint(admin_bp, url_prefix="/yonetim")
     app.register_blueprint(api_bp)

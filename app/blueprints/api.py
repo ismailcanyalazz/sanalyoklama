@@ -1,4 +1,8 @@
-"""QR kod üretimi ve yoklama okutma uç noktaları (JSON/PNG)."""
+"""Görevli ekranı için QR kod üretimi ve canlı durum uç noktaları (JSON/PNG).
+
+Öğrenci tarafındaki okutma akışı bu modülde değil, blueprints/scan.py
+içindedir (öğrenciler sisteme giriş yapmadığı için giriş gerektirmez).
+"""
 from io import BytesIO
 
 import qrcode
@@ -8,26 +12,17 @@ from flask import (
     current_app,
     jsonify,
     make_response,
-    redirect,
-    render_template,
     request,
     send_file,
     url_for,
 )
-from flask_login import current_user, login_required
 from qrcode.constants import ERROR_CORRECT_M
 
 from ..extensions import db
 from ..models import PRESENT_LIKE, AttendanceSession
-from ..services import AttendanceError, mark_attendance_by_code
-from ..utils.audit import client_ip
 from ..utils.decorators import staff_required
 from ..utils.security import (
-    DEVICE_COOKIE_NAME,
     build_scan_payload,
-    new_device_id,
-    parse_scan_payload,
-    scan_limiter,
     seconds_until_refresh,
     totp,
 )
@@ -45,20 +40,17 @@ def _get_session_or_404(session_id: int) -> AttendanceSession:
     return session_obj
 
 
-def _device_id() -> str:
-    return request.cookies.get(DEVICE_COOKIE_NAME) or new_device_id()
+def scan_url(session_id: int, code: str) -> str:
+    """QR kodun içine yazılacak tam adres.
 
-
-def _attach_device_cookie(response, device_id: str):
-    response.set_cookie(
-        DEVICE_COOKIE_NAME,
-        device_id,
-        max_age=60 * 60 * 24 * 365,
-        httponly=True,
-        samesite="Lax",
-        secure=current_app.config.get("SESSION_COOKIE_SECURE", False),
-    )
-    return response
+    PUBLIC_BASE_URL tanımlıysa o kullanılır; böylece panel "localhost" ile
+    açılsa bile QR, telefondan erişilebilen adresi gösterir.
+    """
+    path = url_for("scan.identify", session_id=session_id, code=code)
+    base = current_app.config.get("PUBLIC_BASE_URL")
+    if base:
+        return f"{base}{path}"
+    return url_for("scan.identify", session_id=session_id, code=code, _external=True)
 
 
 def _current_code(session_obj: AttendanceSession) -> str:
@@ -88,9 +80,7 @@ def session_code(session_id: int):
             "session_id": session_obj.id,
             "code": code,
             "payload": build_scan_payload(session_obj.id, code),
-            "link": url_for(
-                "api.scan_link", session_id=session_obj.id, code=code, _external=True
-            ),
+            "link": scan_url(session_obj.id, code),
             "refresh_seconds": session_obj.refresh_seconds,
             "refresh_in": seconds_until_refresh(session_obj.refresh_seconds),
             "seconds_left": session_obj.seconds_left,
@@ -108,10 +98,9 @@ def session_qr(session_id: int):
         abort(410)  # Gone
 
     code = _current_code(session_obj)
-    # QR içeriği: telefonun kendi kamerasıyla okutulduğunda da çalışan tam adres
-    content = url_for(
-        "api.scan_link", session_id=session_obj.id, code=code, _external=True
-    )
+    # QR içeriği: telefonun kamerasıyla okutulduğunda açılan tam adres.
+    # Bu adres kodu doğrular ve öğrenciye numara + ad soyad formunu gösterir.
+    content = scan_url(session_obj.id, code)
 
     qr = qrcode.QRCode(
         version=None,
@@ -166,123 +155,6 @@ def session_state(session_id: int):
     )
 
 
-# --------------------------------------------------------------------------- #
-# Öğrenci tarafı: okutma
-# --------------------------------------------------------------------------- #
-@api_bp.route("/api/yoklama/okut", methods=["POST"])
-@login_required
-def scan():
-    """Tarayıcı içi QR okuyucudan (html5-qrcode) gelen kodu işler."""
-    if not scan_limiter.allow(client_ip() or "bilinmeyen"):
-        return (
-            jsonify({"ok": False, "code": "rate_limit",
-                     "message": "Çok fazla deneme yapıldı. Lütfen bekleyin."}),
-            429,
-        )
-
-    data = request.get_json(silent=True) or request.form
-    payload = (data.get("payload") or "").strip()
-    session_id = data.get("session_id")
-    code = (data.get("code") or "").strip()
-
-    if payload:
-        parsed_id, parsed_code = parse_scan_payload(payload)
-        session_id = parsed_id if parsed_id is not None else session_id
-        code = parsed_code or code
-
-    try:
-        session_id = int(session_id)
-    except (TypeError, ValueError):
-        return (
-            jsonify({"ok": False, "code": "invalid_payload",
-                     "message": "QR kod okunamadı. Tekrar deneyin."}),
-            400,
-        )
-
-    device_id = _device_id()
-    try:
-        record = mark_attendance_by_code(
-            student=current_user,
-            session_id=session_id,
-            code=code,
-            device_id=device_id,
-        )
-    except AttendanceError as error:
-        response = jsonify(
-            {"ok": False, "code": error.code, "message": error.message}
-        )
-        return _attach_device_cookie(response, device_id), 400
-
-    response = jsonify(
-        {
-            "ok": True,
-            "message": "Yoklamanız alındı. Teşekkürler.",
-            "status": record.status_label,
-            "marked_at": record.marked_at.strftime("%d.%m.%Y %H:%M:%S"),
-            "session_title": record.session.title,
-        }
-    )
-    return _attach_device_cookie(response, device_id)
-
-
-@api_bp.route("/yoklama/<int:session_id>/<code>")
-def scan_link(session_id: int, code: str):
-    """Telefonun kendi kamerası ile okutulduğunda açılan adres.
-
-    Oturum açılmamışsa giriş sayfasına yönlendirir; giriş yapıldıktan sonra
-    kullanıcı bu adrese geri döner.
-    """
-    if not current_user.is_authenticated:
-        return redirect(url_for("auth.login", next=request.path))
-
-    if not current_user.is_student:
-        return render_template(
-            "student/scan_result.html",
-            ok=False,
-            message="Yalnızca öğrenci hesapları yoklama verebilir.",
-            record=None,
-        ), 403
-
-    device_id = _device_id()
-    try:
-        record = mark_attendance_by_code(
-            student=current_user,
-            session_id=session_id,
-            code=code,
-            device_id=device_id,
-        )
-    except AttendanceError as error:
-        response = make_response(
-            render_template(
-                "student/scan_result.html",
-                ok=False,
-                message=error.message,
-                record=None,
-            )
-        )
-        return _attach_device_cookie(response, device_id)
-
-    response = make_response(
-        render_template(
-            "student/scan_result.html",
-            ok=True,
-            message="Yoklamanız başarıyla alındı.",
-            record=record,
-        )
-    )
-    return _attach_device_cookie(response, device_id)
-
-
-@api_bp.route("/api/cihaz")
-@login_required
-def device_info():
-    """Tarayıcıya kalıcı bir cihaz kimliği yerleştirir (ilk ziyarette)."""
-    device_id = _device_id()
-    response = jsonify({"device_id": device_id})
-    return _attach_device_cookie(response, device_id)
-
-
-# Tarayıcı içi okuyucu, CSRF başlığını JS ile gönderir; muafiyet tanımlanmaz.
 @api_bp.after_request
 def no_store(response):
     if request.path.startswith("/api/"):

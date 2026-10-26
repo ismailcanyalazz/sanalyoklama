@@ -1,4 +1,5 @@
 """Yönetici paneli: grafikli özet, kullanıcı yönetimi, günlük kayıtları, raporlar."""
+import re
 from datetime import date, datetime, timedelta
 
 from flask import (
@@ -16,8 +17,9 @@ from flask_login import current_user
 from sqlalchemy import or_
 
 from ..extensions import db
-from ..forms import UserForm
+from ..forms import AdminPasswordForm, StudentBulkForm, StudentForm, UserForm
 from ..models import (
+    ROLE_ADMIN,
     ROLE_LABELS,
     ROLE_STUDENT,
     STATUS_LABELS,
@@ -35,6 +37,7 @@ from ..services import (
 from ..utils.audit import log_action
 from ..utils.decorators import admin_required, staff_required
 from ..utils.reports import build_matrix, period_excel, period_pdf
+from ..utils.text import normalize_student_no
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -164,21 +167,18 @@ def users():
 @admin_bp.route("/kullanici/yeni", methods=["GET", "POST"])
 @admin_required
 def user_create():
+    """Görevli / yönetici hesabı oluşturur (öğrenciler için student_create)."""
     form = UserForm()
     if form.validate_on_submit():
         if User.query.filter_by(username=form.username.data.strip()).first():
             flash("Bu kullanıcı adı zaten kayıtlı.", "danger")
         elif not form.password.data:
-            flash("Yeni kullanıcı için parola zorunludur.", "danger")
+            flash("Yeni hesap için parola zorunludur.", "danger")
         else:
             user = User(
                 username=form.username.data.strip(),
                 full_name=form.full_name.data.strip(),
                 role=form.role.data,
-                student_no=(form.student_no.data or "").strip() or None,
-                department=(form.department.data or "").strip() or None,
-                class_year=(form.class_year.data or "").strip() or None,
-                room_no=(form.room_no.data or "").strip() or None,
                 email=(form.email.data or "").strip() or None,
                 phone=(form.phone.data or "").strip() or None,
                 is_active_account=bool(form.is_active_account.data),
@@ -201,6 +201,9 @@ def user_create():
 @admin_required
 def user_edit(user_id: int):
     user = db.session.get(User, user_id) or abort(404)
+    if user.is_student:
+        return redirect(url_for("admin.student_edit", user_id=user.id))
+
     form = UserForm(obj=user)
 
     if form.validate_on_submit():
@@ -213,10 +216,6 @@ def user_edit(user_id: int):
             user.username = form.username.data.strip()
             user.full_name = form.full_name.data.strip()
             user.role = form.role.data
-            user.student_no = (form.student_no.data or "").strip() or None
-            user.department = (form.department.data or "").strip() or None
-            user.class_year = (form.class_year.data or "").strip() or None
-            user.room_no = (form.room_no.data or "").strip() or None
             user.email = (form.email.data or "").strip() or None
             user.phone = (form.phone.data or "").strip() or None
             user.is_active_account = bool(form.is_active_account.data)
@@ -233,6 +232,166 @@ def user_edit(user_id: int):
             return redirect(url_for("admin.users"))
 
     return render_template("admin/user_form.html", form=form, user=user)
+
+
+# --------------------------------------------------------------------------- #
+# Öğrenci kayıtları (okul numarası + ad soyad)
+# --------------------------------------------------------------------------- #
+def _student_no_taken(student_no: str, *, exclude_id: int | None = None) -> bool:
+    """Numara başka bir öğrenciye ait mi? (boşluk/ayraç farkları da sayılır)"""
+    cleaned = normalize_student_no(student_no)
+    for candidate in User.query.filter_by(role=ROLE_STUDENT).all():
+        if exclude_id is not None and candidate.id == exclude_id:
+            continue
+        if normalize_student_no(candidate.student_no) == cleaned:
+            return True
+    return False
+
+
+@admin_bp.route("/ogrenci/yeni", methods=["GET", "POST"])
+@admin_required
+def student_create():
+    """Öğrenciyi okul numarası ve ad soyad ile kaydeder (parola yok)."""
+    form = StudentForm()
+    if form.validate_on_submit():
+        student_no = normalize_student_no(form.student_no.data)
+        if _student_no_taken(student_no):
+            flash("Bu okul numarası zaten kayıtlı.", "danger")
+        elif User.query.filter_by(username=student_no).first():
+            flash("Bu numara başka bir hesapta kullanılıyor.", "danger")
+        else:
+            student = User(
+                # Kullanıcı adı alanı veritabanında zorunlu; öğrencide okul
+                # numarası ile aynı tutulur (giriş için kullanılmaz).
+                username=student_no,
+                student_no=student_no,
+                full_name=form.full_name.data.strip(),
+                role=ROLE_STUDENT,
+                room_no=(form.room_no.data or "").strip() or None,
+                department=(form.department.data or "").strip() or None,
+                class_year=(form.class_year.data or "").strip() or None,
+                phone=(form.phone.data or "").strip() or None,
+                email=(form.email.data or "").strip() or None,
+                is_active_account=bool(form.is_active_account.data),
+            )
+            student.set_password(None)  # öğrenci hesapları parolasızdır
+            db.session.add(student)
+            log_action(
+                "student_create",
+                target_type="user",
+                detail=f"Öğrenci eklendi: {student.full_name} ({student_no}).",
+            )
+            db.session.commit()
+            flash(f"{student.full_name} ({student_no}) eklendi.", "success")
+            return redirect(url_for("admin.users", rol=ROLE_STUDENT))
+
+    return render_template("admin/student_form.html", form=form, student=None)
+
+
+@admin_bp.route("/ogrenci/<int:user_id>/duzenle", methods=["GET", "POST"])
+@admin_required
+def student_edit(user_id: int):
+    student = db.session.get(User, user_id) or abort(404)
+    if not student.is_student:
+        abort(404)
+
+    form = StudentForm(obj=student)
+    if form.validate_on_submit():
+        student_no = normalize_student_no(form.student_no.data)
+        if _student_no_taken(student_no, exclude_id=student.id):
+            flash("Bu okul numarası başka bir öğrencide kullanılıyor.", "danger")
+        else:
+            previous_no = student.student_no
+            student.student_no = student_no
+            # Kullanıcı adı numara ile birlikte güncellenir (giriş için
+            # kullanılmaz; yalnızca benzersizlik içindir).
+            if student.username == previous_no or not student.username:
+                student.username = student_no
+            student.full_name = form.full_name.data.strip()
+            student.room_no = (form.room_no.data or "").strip() or None
+            student.department = (form.department.data or "").strip() or None
+            student.class_year = (form.class_year.data or "").strip() or None
+            student.phone = (form.phone.data or "").strip() or None
+            student.email = (form.email.data or "").strip() or None
+            student.is_active_account = bool(form.is_active_account.data)
+            log_action(
+                "student_update",
+                target_type="user",
+                target_id=student.id,
+                detail=f"Öğrenci kaydı güncellendi: {student.full_name} ({student_no}).",
+            )
+            db.session.commit()
+            flash("Öğrenci kaydı güncellendi.", "success")
+            return redirect(url_for("admin.users", rol=ROLE_STUDENT))
+
+    return render_template("admin/student_form.html", form=form, student=student)
+
+
+@admin_bp.route("/ogrenci/liste-ekle", methods=["GET", "POST"])
+@admin_required
+def student_bulk():
+    """Çok sayıda öğrenciyi 'numara ; ad soyad' satırlarıyla ekler."""
+    form = StudentBulkForm()
+    added: list[str] = []
+    skipped: list[str] = []
+
+    if form.validate_on_submit():
+        for line_no, raw_line in enumerate(form.rows.data.splitlines(), start=1):
+            line = raw_line.strip()
+            if not line:
+                continue
+            parts = [p.strip() for p in re.split(r"[;,\t]+", line) if p.strip()]
+            if len(parts) < 2:
+                skipped.append(f"{line_no}. satır: numara ve ad soyad ayrılamadı")
+                continue
+
+            student_no = normalize_student_no(parts[0])
+            full_name = parts[1]
+            room_no = parts[2] if len(parts) > 2 else None
+
+            if not student_no or len(full_name.split()) < 2:
+                skipped.append(f"{line_no}. satır: eksik bilgi ({line})")
+                continue
+            if _student_no_taken(student_no) or User.query.filter_by(
+                username=student_no
+            ).first():
+                skipped.append(f"{line_no}. satır: {student_no} zaten kayıtlı")
+                continue
+
+            student = User(
+                username=student_no,
+                student_no=student_no,
+                full_name=full_name,
+                role=ROLE_STUDENT,
+                room_no=room_no or None,
+            )
+            student.set_password(None)
+            db.session.add(student)
+            db.session.flush()
+            added.append(f"{student_no} - {full_name}")
+
+        if added:
+            log_action(
+                "student_bulk_create",
+                target_type="user",
+                detail=f"Listeyle {len(added)} öğrenci eklendi.",
+            )
+        db.session.commit()
+
+        if added:
+            flash(f"{len(added)} öğrenci eklendi.", "success")
+        if skipped:
+            flash(
+                "Eklenemeyen satırlar: " + "; ".join(skipped[:10])
+                + (" …" if len(skipped) > 10 else ""),
+                "warning",
+            )
+        if added and not skipped:
+            return redirect(url_for("admin.users", rol=ROLE_STUDENT))
+
+    return render_template(
+        "admin/student_bulk.html", form=form, added=added, skipped=skipped
+    )
 
 
 @admin_bp.route("/kullanici/<int:user_id>/durum", methods=["POST"])
@@ -253,6 +412,126 @@ def user_toggle(user_id: int):
     db.session.commit()
     flash("Hesap durumu güncellendi.", "info")
     return redirect(url_for("admin.users"))
+
+
+# --------------------------------------------------------------------------- #
+# Parola sıfırlama ve hesap silme
+# --------------------------------------------------------------------------- #
+@admin_bp.route("/kullanici/<int:user_id>/parola", methods=["GET", "POST"])
+@admin_required
+def user_password(user_id: int):
+    """Yönetici, bir görevli/yönetici hesabının parolasını sıfırlar."""
+    user = db.session.get(User, user_id) or abort(404)
+    if user.is_student:
+        flash("Öğrenci hesaplarının parolası yoktur; öğrenciler giriş yapmaz.", "info")
+        return redirect(url_for("admin.users", rol=ROLE_STUDENT))
+
+    form = AdminPasswordForm()
+    if form.validate_on_submit():
+        user.set_password(form.new_password.data)
+        log_action(
+            "password_reset",
+            target_type="user",
+            target_id=user.id,
+            detail=f"{user.full_name} hesabının parolası yönetici tarafından sıfırlandı.",
+        )
+        db.session.commit()
+        flash(f"{user.full_name} hesabının parolası güncellendi.", "success")
+        return redirect(url_for("admin.users"))
+
+    return render_template("admin/password_form.html", form=form, user=user)
+
+
+def _detach_user_references(user: User) -> None:
+    """Silinecek kullanıcıya işaret eden kayıtları koparır.
+
+    Günlük kayıtları silinmez; yalnızca kullanıcı bağlantısı boşaltılır
+    (işlemi yapanın adı `actor_name` alanında metin olarak zaten saklı).
+    """
+    AuditLog.query.filter_by(user_id=user.id).update(
+        {"user_id": None}, synchronize_session=False
+    )
+    AttendanceRecord.query.filter_by(updated_by_id=user.id).update(
+        {"updated_by_id": None}, synchronize_session=False
+    )
+
+
+@admin_bp.route("/kullanici/<int:user_id>/sil", methods=["POST"])
+@admin_required
+def user_delete(user_id: int):
+    """Görevli / yönetici hesabını siler."""
+    user = db.session.get(User, user_id) or abort(404)
+
+    if user.is_student:
+        return redirect(url_for("admin.student_delete", user_id=user.id), code=307)
+
+    if user.id == current_user.id:
+        flash("Kendi hesabınızı silemezsiniz.", "warning")
+        return redirect(url_for("admin.users"))
+
+    if user.is_admin and User.query.filter_by(
+        role=ROLE_ADMIN, is_active_account=True
+    ).count() <= 1:
+        flash("Sistemdeki tek yönetici hesabı silinemez.", "danger")
+        return redirect(url_for("admin.users"))
+
+    # Oturum veya izin kaydı açmış bir görevli silinirse geçmiş yoklamaların
+    # sahibi kaybolur; bu yüzden silme engellenir, pasife alma önerilir.
+    session_count = AttendanceSession.query.filter_by(created_by_id=user.id).count()
+    leave_count = Leave.query.filter_by(created_by_id=user.id).count()
+    if session_count or leave_count:
+        flash(
+            f"{user.full_name} silinemez: {session_count} yoklama oturumu ve "
+            f"{leave_count} izin kaydı bu hesaba bağlı. Geçmiş kayıtların "
+            "bozulmaması için hesabı silmek yerine pasife alın.",
+            "danger",
+        )
+        return redirect(url_for("admin.users"))
+
+    name, role_label = user.full_name, user.role_label
+    _detach_user_references(user)
+    db.session.delete(user)
+    log_action(
+        "user_delete",
+        target_type="user",
+        target_id=user_id,
+        detail=f"{name} ({role_label}) hesabı silindi.",
+    )
+    db.session.commit()
+    flash(f"{name} silindi.", "success")
+    return redirect(url_for("admin.users"))
+
+
+@admin_bp.route("/ogrenci/<int:user_id>/sil", methods=["POST"])
+@admin_required
+def student_delete(user_id: int):
+    """Öğrenci kaydını ve ona ait yoklama/izin kayıtlarını siler."""
+    student = db.session.get(User, user_id) or abort(404)
+    if not student.is_student:
+        abort(404)
+
+    record_count = AttendanceRecord.query.filter_by(student_id=student.id).count()
+    name = student.full_name
+    student_no = student.student_no or "-"
+
+    _detach_user_references(student)
+    # Öğrencinin yoklama ve izin kayıtları ilişki tanımındaki cascade ile
+    # birlikte silinir.
+    db.session.delete(student)
+    log_action(
+        "student_delete",
+        target_type="user",
+        target_id=user_id,
+        detail=(
+            f"Öğrenci silindi: {name} ({student_no}); "
+            f"{record_count} yoklama kaydı da silindi."
+        ),
+    )
+    db.session.commit()
+    flash(
+        f"{name} ({student_no}) ve {record_count} yoklama kaydı silindi.", "success"
+    )
+    return redirect(url_for("admin.users", rol=ROLE_STUDENT))
 
 
 @admin_bp.route("/ogrenci/<int:user_id>")

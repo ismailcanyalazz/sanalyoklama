@@ -1,0 +1,7 @@
+# Geliştirme ve test bağımlılıkları.
+# Kurulum:  pip install -r requirements-dev.txt
+-r requirements.txt
+
+pytest>=8.0
+# Telefonla HTTPS üzerinden yerel test için (isteğe bağlı):
+# pyopenssl>=24.0

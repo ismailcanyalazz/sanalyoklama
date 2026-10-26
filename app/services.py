@@ -32,6 +32,7 @@ from .models import (
 )
 from .utils.audit import client_ip, log_action, user_agent
 from .utils.security import generate_secret, verify_totp
+from .utils.text import names_match, normalize_student_no
 
 
 class AttendanceError(Exception):
@@ -43,6 +44,15 @@ class AttendanceError(Exception):
         self.code = code
 
 
+# Numara/ad eşleşmediğinde gösterilen tek tip mesaj. Hangi alanın hatalı
+# olduğunun söylenmemesi, deneme yanılma ile öğrenci listesinin çıkarılmasını
+# zorlaştırır.
+IDENTITY_MISMATCH_MESSAGE = (
+    "Okul numarası ile ad soyad kayıtlarla eşleşmiyor. "
+    "Bilgilerinizi kontrol edin; sorun sürerse yurt görevlisine başvurun."
+)
+
+
 # --------------------------------------------------------------------------- #
 # Öğrenci listesi
 # --------------------------------------------------------------------------- #
@@ -52,6 +62,67 @@ def active_students() -> list[User]:
         .order_by(User.full_name)
         .all()
     )
+
+
+def find_student_by_no(student_no: str) -> User | None:
+    """Okul numarasından öğrenciyi bulur (boşluk/ayraç farklarını tolere eder)."""
+    cleaned = normalize_student_no(student_no)
+    if not cleaned:
+        return None
+
+    student = User.query.filter_by(student_no=cleaned, role=ROLE_STUDENT).first()
+    if student is not None:
+        return student
+
+    # Numara veritabanında boşluklu/ayraçlı kaydedilmiş olabilir
+    for candidate in User.query.filter_by(role=ROLE_STUDENT).all():
+        if normalize_student_no(candidate.student_no) == cleaned:
+            return candidate
+    return None
+
+
+def resolve_student_identity(student_no: str, full_name: str) -> User:
+    """Okul numarası + ad soyad ikilisini doğrulayıp öğrenciyi döndürür.
+
+    Öğrenciler sisteme giriş yapmadığı için kimlik, yoklama anında girilen bu
+    iki bilgi ile doğrulanır. Numara bulunamazsa ya da ad soyad kayıtla
+    uyuşmazsa okutma reddedilir.
+    """
+    cleaned_no = normalize_student_no(student_no)
+    given_name = (full_name or "").strip()
+
+    if not cleaned_no or not given_name:
+        raise AttendanceError(
+            "Okul numarası ve ad soyad alanlarının ikisi de doldurulmalıdır.",
+            "missing_identity",
+        )
+
+    student = find_student_by_no(cleaned_no)
+
+    if student is None or not names_match(student.full_name, given_name):
+        log_action(
+            "scan_rejected",
+            detail=(
+                "Kimlik doğrulanamadı "
+                f"(girilen numara: {cleaned_no}, girilen ad: {given_name})."
+            ),
+            commit=True,
+        )
+        raise AttendanceError(IDENTITY_MISMATCH_MESSAGE, "identity_mismatch")
+
+    if not student.is_active_account:
+        log_action(
+            "scan_rejected",
+            target_type="user",
+            target_id=student.id,
+            detail=f"Pasif öğrenci kaydı ile okutma denemesi ({cleaned_no}).",
+            commit=True,
+        )
+        raise AttendanceError(
+            "Kaydınız pasif durumda. Yurt yönetimine başvurun.", "inactive"
+        )
+
+    return student
 
 
 # --------------------------------------------------------------------------- #
@@ -211,27 +282,8 @@ def get_open_session(day: date | None = None) -> AttendanceSession | None:
 # --------------------------------------------------------------------------- #
 # QR ile yoklama alma
 # --------------------------------------------------------------------------- #
-def mark_attendance_by_code(
-    *,
-    student: User,
-    session_id: int,
-    code: str,
-    device_id: str,
-) -> AttendanceRecord:
-    """QR koddan gelen tek kullanımlık kodu doğrular ve öğrenciyi mevcut işaretler.
-
-    Doğrulama adımları
-    ------------------
-    1. Oturum var mı, açık mı (süresi dolmuşsa otomatik kapatılır)?
-    2. Kod, oturumun gizli anahtarı ile üretilmiş geçerli bir TOTP mi?
-    3. Öğrenci bu oturumda daha önce kaydedilmiş mi?
-    4. Aynı cihaz bu oturumda başka bir öğrenci için kullanılmış mı?
-    """
-    if not student.is_student:
-        raise AttendanceError(
-            "Yalnızca öğrenci hesapları QR kod ile yoklama verebilir.", "role"
-        )
-
+def require_open_session(session_id: int) -> AttendanceSession:
+    """Oturumu bulur ve açık olduğunu doğrular; süresi dolmuşsa kapatır."""
     session_obj = db.session.get(AttendanceSession, session_id)
     if session_obj is None:
         raise AttendanceError("Yoklama oturumu bulunamadı.", "not_found")
@@ -243,6 +295,19 @@ def mark_attendance_by_code(
             "Bu yoklama oturumu kapanmış. Lütfen yurt görevlisine başvurun.",
             "closed",
         )
+    return session_obj
+
+
+def verify_session_code(
+    session_id: int, code: str, *, student: User | None = None
+) -> AttendanceSession:
+    """Oturumu bulup açık olduğunu ve kodun geçerliliğini doğrular.
+
+    Kimlik (numara + ad soyad) sorgulanmadan önce çağrılır: geçerli bir QR
+    kodu olmayan birinin formu deneme yanılma ile öğrenci listesi çıkarmak
+    için kullanmasını engeller.
+    """
+    session_obj = require_open_session(session_id)
 
     if not verify_totp(
         session_obj.secret,
@@ -263,11 +328,42 @@ def mark_attendance_by_code(
             "invalid_code",
         )
 
+    return session_obj
+
+
+def mark_attendance_by_code(
+    *,
+    student: User,
+    session_id: int,
+    code: str | None,
+    device_id: str,
+    code_already_verified: bool = False,
+) -> AttendanceRecord:
+    """QR koddan gelen tek kullanımlık kodu doğrular ve öğrenciyi mevcut işaretler.
+
+    Doğrulama adımları
+    ------------------
+    1. Oturum var mı, açık mı (süresi dolmuşsa otomatik kapatılır)?
+    2. Kod, oturumun gizli anahtarı ile üretilmiş geçerli bir TOTP mi?
+    3. Öğrenci bu oturumda daha önce kaydedilmiş mi?
+    4. Aynı cihaz bu oturumda başka bir öğrenci için kullanılmış mı?
+    """
+    if not student.is_student:
+        raise AttendanceError(
+            "Yalnızca öğrenci hesapları QR kod ile yoklama verebilir.", "role"
+        )
+
+    if code_already_verified:
+        # Kod, okutma bileti verilirken doğrulanmıştı (bkz. blueprints/scan.py)
+        session_obj = require_open_session(session_id)
+    else:
+        session_obj = verify_session_code(session_id, code, student=student)
+
     record = AttendanceRecord.query.filter_by(
         session_id=session_obj.id, student_id=student.id
     ).first()
 
-    if record is not None and record.status in PRESENT_LIKE and record.method == METHOD_QR:
+    if record is not None and record.status in PRESENT_LIKE:
         raise AttendanceError(
             f"Bu oturumda zaten yoklama verdiniz "
             f"({record.marked_at:%H:%M}).",
@@ -336,6 +432,31 @@ def mark_attendance_by_code(
             "duplicate",
         )
     return record
+
+
+def mark_attendance_with_identity(
+    *,
+    student_no: str,
+    full_name: str,
+    session_id: int,
+    code: str,
+    device_id: str,
+) -> AttendanceRecord:
+    """Öğrencinin girdiği numara + ad soyad ile yoklama alır.
+
+    Öğrenci sisteme giriş yapmaz: ekrandaki QR kodu okutur, açılan formda
+    okul numarasını ve ad soyadını yazar. Bu iki bilgi kayıtla eşleşirse
+    yoklama 'Mevcut' olarak işlenir, eşleşmezse okutma reddedilir.
+    """
+    # Önce kod: geçerli bir QR olmadan kimlik sorgulanmaz.
+    verify_session_code(session_id, code)
+    student = resolve_student_identity(student_no, full_name)
+    return mark_attendance_by_code(
+        student=student,
+        session_id=session_id,
+        code=code,
+        device_id=device_id,
+    )
 
 
 # --------------------------------------------------------------------------- #

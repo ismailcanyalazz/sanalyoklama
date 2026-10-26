@@ -117,7 +117,8 @@ def run_seed(students: int = 12, days: int = 10, seed_value: int = 20260521) -> 
             phone=f"05{random.randint(10, 59)} {random.randint(100, 999)} "
                   f"{random.randint(10, 99)} {random.randint(10, 99)}",
         )
-        student.set_password("Ogrenci1234!")
+        # Öğrenciler sisteme giriş yapmaz: parolasız kaydedilir
+        student.set_password(None)
         db.session.add(student)
         student_list.append(student)
 
@@ -236,11 +237,13 @@ def run_seed(students: int = 12, days: int = 10, seed_value: int = 20260521) -> 
     print("Örnek veri hazır.")
     print(f"  Öğrenci sayısı      : {len(student_list)}")
     print(f"  Yeni oturum sayısı  : {created_sessions}")
-    print("  Giriş bilgileri:")
+    print("  Giriş bilgileri (yalnızca görevli/yönetici giriş yapar):")
     print("    Yönetici      : admin / Admin1234!")
     print("    Yurt görevlisi: gorevli / Gorevli1234!")
     if student_list:
-        print(f"    Öğrenci       : {student_list[0].student_no} / Ogrenci1234!")
+        print("  Öğrenci yoklaması için örnek kimlik (giriş yok, QR sonrası form):")
+        print(f"    Numara        : {student_list[0].student_no}")
+        print(f"    Ad Soyad      : {student_list[0].full_name}")
 
 
 if __name__ == "__main__":

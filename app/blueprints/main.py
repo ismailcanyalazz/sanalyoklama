@@ -12,7 +12,7 @@ def index():
             return redirect(url_for("admin.dashboard"))
         if current_user.is_staff:
             return redirect(url_for("staff.dashboard"))
-        return redirect(url_for("student.dashboard"))
+    # Öğrenciler giriş yapmaz; karşılama sayfasından yoklama akışına geçerler.
     return render_template("index.html")
 
 
