@@ -29,6 +29,7 @@ from .models import (
     Leave,
     User,
     now,
+    today,
 )
 from .utils.audit import client_ip, log_action, user_agent
 from .utils.security import generate_secret, verify_totp
@@ -497,7 +498,7 @@ def update_record_manually(
 # İstatistikler
 # --------------------------------------------------------------------------- #
 def session_date_bounds(days: int = 30) -> tuple[date, date]:
-    end = date.today()
+    end = today()
     start = end - timedelta(days=days - 1)
     return start, end
 

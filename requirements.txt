@@ -21,3 +21,6 @@ gunicorn>=21.2
 psycopg2-binary>=2.9
 
 # Geliştirme ve test bağımlılıkları requirements-dev.txt dosyasındadır.
+
+# Saat dilimi veritabanı (bulut ortamlarında zoneinfo için gerekir)
+tzdata>=2024.1

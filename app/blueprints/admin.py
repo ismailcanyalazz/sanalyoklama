@@ -28,6 +28,7 @@ from ..models import (
     AuditLog,
     Leave,
     User,
+    today,
 )
 from ..services import (
     active_students,
@@ -47,8 +48,8 @@ admin_bp = Blueprint("admin", __name__)
 # --------------------------------------------------------------------------- #
 def _parse_range() -> tuple[date, date]:
     """Rapor filtresindeki tarih aralığını okur (varsayılan: son 30 gün)."""
-    today = date.today()
-    default_start = today - timedelta(days=29)
+    today_date = today()
+    default_start = today_date - timedelta(days=29)
 
     def _parse(name: str, fallback: date) -> date:
         raw = request.args.get(name, "")
@@ -58,7 +59,7 @@ def _parse_range() -> tuple[date, date]:
             return fallback
 
     start = _parse("baslangic", default_start)
-    end = _parse("bitis", today)
+    end = _parse("bitis", today_date)
     if end < start:
         start, end = end, start
     return start, end

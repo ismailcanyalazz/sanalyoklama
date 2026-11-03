@@ -66,3 +66,31 @@ def test_invalid_payload_returns_none():
 
 def test_refresh_countdown_in_range():
     assert 1 <= seconds_until_refresh(15) <= 15
+
+
+# --------------------------------------------------------------------------- #
+# Saat dilimi: sunucu UTC'de olsa da yoklama saatleri yurdun saatiyle tutulur
+# --------------------------------------------------------------------------- #
+def test_app_time_follows_configured_timezone():
+    """Sunucu saati ne olursa olsun now(), APP_TIMEZONE'a göre üretilir."""
+    import os
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from app.models import APP_TZ, now, today
+
+    expected_zone = os.environ.get("APP_TIMEZONE", "Europe/Istanbul")
+    assert APP_TZ == ZoneInfo(expected_zone)
+
+    beklenen = datetime.now(ZoneInfo(expected_zone)).replace(tzinfo=None)
+    fark = abs((now() - beklenen).total_seconds())
+    assert fark < 5, "now() yapılandırılan saat dilimini izlemiyor"
+    assert today() == beklenen.date()
+
+
+def test_app_time_is_naive_and_second_precision():
+    from app.models import now
+
+    anlik = now()
+    assert anlik.tzinfo is None, "zaman damgaları saat dilimi bilgisiz saklanır"
+    assert anlik.microsecond == 0

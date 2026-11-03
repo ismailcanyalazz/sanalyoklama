@@ -23,6 +23,7 @@ from ..models import (
     AttendanceSession,
     Leave,
     now,
+    today,
 )
 from ..services import (
     AttendanceError,
@@ -54,7 +55,7 @@ def restrict_to_staff():
 def dashboard():
     open_session = get_open_session()
     today_sessions = (
-        AttendanceSession.query.filter_by(session_date=date.today())
+        AttendanceSession.query.filter_by(session_date=today())
         .order_by(AttendanceSession.opened_at.desc())
         .all()
     )
@@ -276,7 +277,7 @@ def leaves():
         return redirect(url_for("staff.leaves"))
 
     upcoming = (
-        Leave.query.filter(Leave.end_date >= date.today() - timedelta(days=30))
+        Leave.query.filter(Leave.end_date >= today() - timedelta(days=30))
         .order_by(Leave.start_date.desc())
         .all()
     )

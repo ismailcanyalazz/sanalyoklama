@@ -1,5 +1,4 @@
 """WTForms tabanlı formlar (CSRF koruması Flask-WTF ile sağlanır)."""
-from datetime import date
 
 from flask_wtf import FlaskForm
 from wtforms import (
@@ -21,7 +20,14 @@ from wtforms.validators import (
     ValidationError,
 )
 
-from .models import LEAVE_TYPES, ROLE_ADMIN, ROLE_LABELS, ROLE_STAFF, STATUS_LABELS
+from .models import (
+    LEAVE_TYPES,
+    ROLE_ADMIN,
+    ROLE_LABELS,
+    ROLE_STAFF,
+    STATUS_LABELS,
+    today,
+)
 
 
 class LoginForm(FlaskForm):
@@ -61,7 +67,7 @@ class SessionForm(FlaskForm):
         validators=[DataRequired("Başlık zorunludur."), Length(max=160)],
     )
     session_date = DateField(
-        "Tarih", default=date.today, validators=[DataRequired("Tarih zorunludur.")]
+        "Tarih", default=today, validators=[DataRequired("Tarih zorunludur.")]
     )
     start_time = TimeField("Başlangıç Saati", validators=[DataRequired()])
     end_time = TimeField("Bitiş Saati", validators=[DataRequired()])
@@ -192,8 +198,8 @@ class LeaveForm(FlaskForm):
     leave_type = SelectField(
         "Tür", choices=[(key, label) for key, label in LEAVE_TYPES.items()]
     )
-    start_date = DateField("Başlangıç", default=date.today, validators=[DataRequired()])
-    end_date = DateField("Bitiş", default=date.today, validators=[DataRequired()])
+    start_date = DateField("Başlangıç", default=today, validators=[DataRequired()])
+    end_date = DateField("Bitiş", default=today, validators=[DataRequired()])
     note = TextAreaField("Açıklama", validators=[Optional(), Length(max=500)])
     submit = SubmitField("İzin Kaydet")
 

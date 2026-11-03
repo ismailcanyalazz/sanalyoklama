@@ -8,7 +8,9 @@ attendance_records  : her öğrenci için oturum bazlı yoklama kaydı
 leaves              : izin / rapor kayıtları (otomatik "izinli" işaretlemesi)
 audit_logs          : tüm kritik işlemlerin zaman damgalı günlüğü
 """
+import os
 from datetime import date, datetime, time, timedelta
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from flask_login import UserMixin
 from sqlalchemy import UniqueConstraint
@@ -81,9 +83,38 @@ LEAVE_STATUS_MAP = {
 }
 
 
+# --------------------------------------------------------------------------- #
+# Zaman
+# --------------------------------------------------------------------------- #
+# Sunucu saati her zaman yurdun saati değildir: bulut sunucuları (Vercel vb.)
+# UTC ile çalışır. Yoklama saatleri, oturum bitişi ve rapor gün sınırları yurdun
+# yerel saatine göre hesaplanmalıdır; bu yüzden saat dilimi açıkça belirlenir.
+# APP_TIMEZONE ortam değişkeni ile değiştirilebilir.
+def _load_timezone() -> ZoneInfo | None:
+    name = (os.environ.get("APP_TIMEZONE") or "Europe/Istanbul").strip()
+    try:
+        return ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ValueError, OSError):
+        # Saat dilimi veritabanı yoksa sunucu saatine düşülür
+        return None
+
+
+APP_TZ = _load_timezone()
+
+
 def now() -> datetime:
-    """Saniye hassasiyetinde yerel zaman."""
-    return datetime.now().replace(microsecond=0)
+    """Yurdun yerel saatiyle, saniye hassasiyetinde zaman (saat dilimi bilgisiz).
+
+    Veritabanındaki tüm zaman damgaları bu yerel saatle saklanır.
+    """
+    if APP_TZ is None:
+        return datetime.now().replace(microsecond=0)
+    return datetime.now(APP_TZ).replace(tzinfo=None, microsecond=0)
+
+
+def today() -> date:
+    """Yurdun yerel saatine göre bugünün tarihi."""
+    return now().date()
 
 
 # --------------------------------------------------------------------------- #
@@ -192,7 +223,7 @@ class AttendanceSession(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(160), nullable=False, default="Akşam Yoklaması")
-    session_date = db.Column(db.Date, nullable=False, default=date.today, index=True)
+    session_date = db.Column(db.Date, nullable=False, default=today, index=True)
     start_time = db.Column(db.Time, nullable=False)
     end_time = db.Column(db.Time, nullable=False)
 

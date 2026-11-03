@@ -95,8 +95,11 @@ class Config:
     ENFORCE_DEVICE_UNIQUENESS = _as_bool(
         os.environ.get("ENFORCE_DEVICE_UNIQUENESS"), True
     )
-    # Okutma denemesi hız sınırı: aynı IP için 1 dakikada en fazla N istek
-    SCAN_RATE_LIMIT = int(os.environ.get("SCAN_RATE_LIMIT", 30))
+    # Okutma denemesi hız sınırı: aynı IP için 1 dakikada en fazla N istek.
+    # Yurt Wi-Fi'ında tüm öğrenciler tek bir genel IP'den çıktığı için bu sayı
+    # bir yoklamada okutma yapacak öğrenci sayısından rahatça yüksek olmalıdır;
+    # aksi hâlde sıradaki öğrenciler "çok fazla deneme" hatası alır.
+    SCAN_RATE_LIMIT = int(os.environ.get("SCAN_RATE_LIMIT", 240))
     # QR okutulduktan sonra numara + ad soyad formunun doldurulması için
     # tanınan süre (saniye). Kod bu sürede yenilenmeye devam eder; forma
     # özel kısa ömürlü bilet bu süre boyunca geçerlidir.
