@@ -83,6 +83,14 @@ class Config:
     REMEMBER_COOKIE_HTTPONLY = True
     PERMANENT_SESSION_LIFETIME = 60 * 60 * 8  # 8 saat
     WTF_CSRF_TIME_LIMIT = None
+    # Flask-WTF, HTTPS isteklerinde CSRF belirtecine ek olarak Referer
+    # başlığını da arar ve başlık yoksa isteği "400 Bad Request" ile reddeder.
+    # Gizlilik ayarları yüzünden Referer göndermeyen telefon tarayıcılarında bu,
+    # öğrencinin yoklama verememesi demektir. Oturum çerezi SameSite=Lax
+    # olduğundan siteler arası bir POST'ta çerez hiç gönderilmez ve belirteç
+    # doğrulanamaz; bu yüzden Referer kontrolü gereksizdir, belirteç kontrolü
+    # olduğu gibi sürer.
+    WTF_CSRF_SSL_STRICT = False
 
     # --- Yoklama / QR ayarları ---
     # Ekranda görünen QR kodun yenilenme ve TOTP adım süresi (saniye)

@@ -353,3 +353,83 @@ def test_admin_dashboard_renders_for_admin(client, open_session):
     response = client.get("/yonetim/")
     assert response.status_code == 200
     assert "İstatistik".encode("utf-8") in response.data
+
+
+# --------------------------------------------------------------------------- #
+# CSRF: HTTPS üzerinde Referer başlığı olmadan da form gönderilebilmeli
+# --------------------------------------------------------------------------- #
+def test_scan_form_works_without_referer_header_over_https(app, open_session, students):
+    """Referer göndermeyen telefon tarayıcılarında yoklama alınabilmeli.
+
+    Flask-WTF, HTTPS isteklerinde Referer başlığını da arar ve başlık yoksa
+    isteği 400 ile reddeder. Oturum çerezi SameSite=Lax olduğu için bu kontrol
+    gereksizdir (WTF_CSRF_SSL_STRICT=False); bu test ayarın geri alınmasını
+    engeller.
+    """
+    import re
+
+    from app.models import AttendanceRecord, STATUS_PRESENT
+    from app.utils.security import totp
+
+    app.config["WTF_CSRF_ENABLED"] = True
+    try:
+        base = "https://ornek.test"
+        client = app.test_client()
+        student = students[0]
+        code = totp(open_session.secret, step=open_session.refresh_seconds)
+
+        page = client.get(f"{base}/yoklama/{open_session.id}/{code}").get_data(
+            as_text=True
+        )
+        csrf = re.search(r'name="csrf_token"[^>]*value="([^"]+)"', page)
+        ticket = re.search(r'name="ticket"\s+value="([^"]+)"', page)
+        assert csrf and ticket, "form belirteçleri üretilmedi"
+
+        # Referer başlığı bilerek gönderilmiyor
+        response = client.post(
+            f"{base}/yoklama/kaydet",
+            data={
+                "csrf_token": csrf.group(1),
+                "ticket": ticket.group(1),
+                "student_no": student.student_no,
+                "full_name": student.full_name,
+            },
+        )
+        assert response.status_code == 200, response.get_data(as_text=True)[:200]
+        assert "alındı".encode("utf-8") in response.data
+
+        record = AttendanceRecord.query.filter_by(
+            session_id=open_session.id, student_id=student.id
+        ).first()
+        assert record.status == STATUS_PRESENT
+    finally:
+        app.config["WTF_CSRF_ENABLED"] = False
+
+
+def test_csrf_token_is_still_required(app, open_session, students):
+    """Referer kontrolü kapalı olsa da CSRF belirteci zorunlu kalmalı."""
+    import re
+
+    from app.utils.security import totp
+
+    app.config["WTF_CSRF_ENABLED"] = True
+    try:
+        base = "https://ornek.test"
+        client = app.test_client()
+        code = totp(open_session.secret, step=open_session.refresh_seconds)
+        page = client.get(f"{base}/yoklama/{open_session.id}/{code}").get_data(
+            as_text=True
+        )
+        ticket = re.search(r'name="ticket"\s+value="([^"]+)"', page)
+
+        response = client.post(
+            f"{base}/yoklama/kaydet",
+            data={
+                "ticket": ticket.group(1),
+                "student_no": students[0].student_no,
+                "full_name": students[0].full_name,
+            },
+        )
+        assert response.status_code == 400
+    finally:
+        app.config["WTF_CSRF_ENABLED"] = False
